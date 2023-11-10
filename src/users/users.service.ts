@@ -25,4 +25,12 @@ export class UsersService {
 			password,
 		});
 	}
+
+	async findOne(where: FindOptionsWhere<User>): Promise<User> {
+		return await this.usersRepository.findOne({ where });
+	}
+
+	async updateOne(where: FindOptionsWhere<User>, user: Partial<User>) {
+		return await this.usersRepository.update(where, user);
+	}
 }
