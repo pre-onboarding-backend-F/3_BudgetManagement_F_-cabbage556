@@ -4,7 +4,7 @@ import { Column, Entity } from 'typeorm';
 @Entity()
 export class User extends BaseEntity {
 	@Column({ unique: true })
-	account: string;
+	username: string;
 
 	@Column()
 	password: string;
