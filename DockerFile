@@ -1,0 +1,9 @@
+FROM node:18
+
+COPY ./package.json /api_bm/
+COPY ./package-lock.json /api_bm/
+WORKDIR /api_bm/
+RUN npm install
+
+COPY . /api_bm/
+CMD npm run start:dev

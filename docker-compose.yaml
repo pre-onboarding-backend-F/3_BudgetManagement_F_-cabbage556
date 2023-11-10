@@ -1,0 +1,38 @@
+services:
+    api:
+        container_name: api_bm
+        build:
+            context: .
+            dockerfile: DockerFile
+        volumes:
+            - ./src:/api_bm/src
+        restart: always
+        ports:
+            - ${SERVER_PORT}:${SERVER_PORT}
+        depends_on:
+            - dev_db
+        networks:
+            - container-network
+
+    dev_db:
+        image: postgres
+        container_name: db_bm
+        environment:
+            POSTGRES_USER: ${POSTGRESQL_USER}
+            POSTGRES_PASSWORD: ${POSTGRESQL_PASSWORD}
+            POSTGRES_DB: ${POSTGRESQL_DATABASE}
+        restart: always
+        ports:
+            - ${POSTGRESQL_PORT}:${POSTGRESQL_PORT}
+        networks:
+            - container-network
+
+volumes:
+    postgres:
+        driver: cio
+        driver_opts:
+            profile: 'POSTGRESQL'
+
+networks:
+    container-network:
+        driver: bridge
