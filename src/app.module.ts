@@ -4,6 +4,7 @@ import { ConfigModule } from '@nestjs/config';
 import { validationSchema } from './global/configs/validation.schema';
 import { UsersModule } from './users/users.module';
 import jwtConfiguration from './global/configs/jwt.configuration';
+import { AuthModule } from './auth';
 
 @Module({
 	imports: [
@@ -16,6 +17,7 @@ import jwtConfiguration from './global/configs/jwt.configuration';
 		}),
 		DatabaseModule,
 		UsersModule,
+		AuthModule,
 	],
 })
 export class AppModule {}
