@@ -10,8 +10,8 @@ export class CheckAccountPipe implements PipeTransform {
 	) {}
 
 	async transform(value: CreateUserDto) {
-		const { account } = value;
-		const userExist = await this.usersSerivce.isUserExist({ account });
+		const { username } = value;
+		const userExist = await this.usersSerivce.isUserExist({ username });
 		if (userExist) {
 			throw new ConflictException(UserException.ACCOUNT_ALREADY_EXISTS);
 		}

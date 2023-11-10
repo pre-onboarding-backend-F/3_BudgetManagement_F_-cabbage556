@@ -1,9 +1,9 @@
 import { IsNotEmpty, IsString, Matches } from 'class-validator';
 
 export class CreateUserDto {
-	@IsNotEmpty({ message: 'account 필드는 필수 입력 필드입니다.' })
-	@IsString({ message: 'account 필드에 문자열을 입력해야 합니다.' })
-	account: string;
+	@IsNotEmpty({ message: 'username 필드는 필수 입력 필드입니다.' })
+	@IsString({ message: 'username 필드에 문자열을 입력해야 합니다.' })
+	username: string;
 
 	@IsNotEmpty({ message: 'password 필드는 필수 입력 필드입니다.' })
 	@IsString({ message: 'password 필드에 문자열을 입력해야 합니다.' })

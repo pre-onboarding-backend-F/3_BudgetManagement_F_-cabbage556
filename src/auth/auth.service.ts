@@ -20,8 +20,8 @@ export class AuthService {
 		return await bcrypt.compare(plainPassword, hashedPassword);
 	}
 
-	async validateUser(account: string, password: string) {
-		const user = await this.usersService.findOne({ account });
+	async validateUser(username: string, password: string) {
+		const user = await this.usersService.findOne({ username });
 		if (!user) {
 			throw new NotFoundException(AuthException.USER_NOT_EXISTS);
 		}
@@ -34,10 +34,10 @@ export class AuthService {
 	}
 
 	async login(user: User) {
-		const { id, account } = user;
+		const { id, username } = user;
 
-		const accessToken = this.generateAccessToken({ id, account });
-		const refreshToken = this.generateRefreshToken({ id, account });
+		const accessToken = this.generateAccessToken({ id, username });
+		const refreshToken = this.generateRefreshToken({ id, username });
 
 		user.refreshToken = refreshToken;
 		await this.usersService.updateOne({ id }, user);

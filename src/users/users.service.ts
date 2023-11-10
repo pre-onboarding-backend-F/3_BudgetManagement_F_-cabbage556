@@ -17,11 +17,11 @@ export class UsersService {
 	}
 
 	async createUser(createUserDto: CreateUserDto) {
-		const { account, password: plainPassword } = createUserDto;
+		const { username, password: plainPassword } = createUserDto;
 		const password = await bcrypt.hash(plainPassword, 10);
 
 		await this.usersRepository.save({
-			account,
+			username,
 			password,
 		});
 	}
