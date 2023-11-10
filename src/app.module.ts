@@ -3,6 +3,7 @@ import { DatabaseModule } from './database/database.module';
 import { ConfigModule } from '@nestjs/config';
 import { validationSchema } from './global/configs/validation.schema';
 import { UsersModule } from './users/users.module';
+import { AuthModule } from './auth/auth.module';
 import jwtConfiguration from './global/configs/jwt.configuration';
 
 @Module({
@@ -16,6 +17,7 @@ import jwtConfiguration from './global/configs/jwt.configuration';
 		}),
 		DatabaseModule,
 		UsersModule,
+		AuthModule,
 	],
 })
 export class AppModule {}
