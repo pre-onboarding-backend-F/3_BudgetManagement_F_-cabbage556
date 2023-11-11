@@ -8,7 +8,7 @@ export class JwtExceptionFilter implements ExceptionFilter {
 		const ctx = host.switchToHttp();
 		const response = ctx.getResponse<Response>();
 		const request = ctx.getRequest<Request>();
-		const status = HttpStatus.BAD_REQUEST;
+		const status = HttpStatus.UNAUTHORIZED;
 
 		response.status(status).json({
 			success: false,

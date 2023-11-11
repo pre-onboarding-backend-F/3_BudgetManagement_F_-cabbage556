@@ -48,6 +48,20 @@ export class AuthService {
 		};
 	}
 
+	async logout(user: User) {
+		await this.usersService.updateOne({ id: user.id }, { refreshToken: null });
+	}
+
+	refresh(user: User) {
+		return {
+			accessToken: this.generateAccessToken({ id: user.id, username: user.username }),
+		};
+	}
+
+	async checkAlreadyLogOut(id: string): Promise<User | null> {
+		return await this.usersService.findOne({ id });
+	}
+
 	generateAccessToken(payload: TokenPayload): string {
 		return this.jwtService.sign(payload, {
 			secret: this.config.access.secret,
