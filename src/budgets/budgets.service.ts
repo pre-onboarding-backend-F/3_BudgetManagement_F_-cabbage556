@@ -1,12 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Budget } from './entity';
-import { Repository } from 'typeorm';
+import { CategoryBudgetsService } from 'src/category-budgets';
+import { MonthlyBudgetsService } from 'src/monthly-budgets';
 
 @Injectable()
 export class BudgetsService {
 	constructor(
-		@InjectRepository(Budget)
-		private readonly budgetsRepository: Repository<Budget>, //
+		private readonly monthlyBudgetsService: MonthlyBudgetsService,
+		private readonly categoryBudgetsService: CategoryBudgetsService,
 	) {}
 }
