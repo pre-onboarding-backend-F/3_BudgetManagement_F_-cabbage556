@@ -2,7 +2,7 @@ import { NestFactory, Reflector } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ConfigService } from '@nestjs/config';
 import { ValidationPipe } from '@nestjs/common';
-import { HttpExceptionFilter, TransformInterceptor } from './global';
+import { HttpExceptionFilter, JwtExceptionFilter, TransformInterceptor } from './global';
 
 async function bootstrap() {
 	const app = await NestFactory.create(AppModule);
@@ -10,7 +10,7 @@ async function bootstrap() {
 	const reflector = new Reflector();
 
 	app.useGlobalInterceptors(new TransformInterceptor(reflector));
-	app.useGlobalFilters(new HttpExceptionFilter());
+	app.useGlobalFilters(new HttpExceptionFilter(), new JwtExceptionFilter());
 	app.useGlobalPipes(
 		new ValidationPipe({
 			transform: true,
