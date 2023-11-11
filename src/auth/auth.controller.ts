@@ -1,12 +1,11 @@
-import { Controller, HttpCode, Post, UseFilters, UseGuards } from '@nestjs/common';
+import { Controller, HttpCode, Post, UseGuards } from '@nestjs/common';
 import { AccessTokenGuard, LocalLoginAuthGuard, RefreshTokenGuard } from './guards';
-import { GetUser, JwtExceptionFilter, ResponseMessage } from 'src/global';
+import { GetUser, ResponseMessage } from 'src/global';
 import { User } from 'src/users';
 import { AuthService } from './auth.service';
 import { AuthResponse } from './enums';
 
 @Controller('auth')
-@UseFilters(JwtExceptionFilter)
 export class AuthController {
 	constructor(
 		private readonly authService: AuthService, //
