@@ -20,4 +20,8 @@ export class CategoriesService implements OnModuleInit {
 			skipUpdateIfNoValuesChanged: true,
 		});
 	}
+
+	async findAll(): Promise<Category[]> {
+		return await this.categoriesRepository.find();
+	}
 }
