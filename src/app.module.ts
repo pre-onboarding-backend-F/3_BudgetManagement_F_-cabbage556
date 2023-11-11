@@ -7,6 +7,7 @@ import jwtConfiguration from './global/configs/jwt.configuration';
 import { AuthModule } from './auth';
 import { CategoriesModule } from './categories/categories.module';
 import { BudgetsModule } from './budgets';
+import { CategoryBudgetsModule } from './category-budgets';
 
 @Module({
 	imports: [
@@ -22,6 +23,7 @@ import { BudgetsModule } from './budgets';
 		AuthModule,
 		CategoriesModule,
 		BudgetsModule,
+		CategoryBudgetsModule,
 	],
 })
 export class AppModule {}
