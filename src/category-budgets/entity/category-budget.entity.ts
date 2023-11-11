@@ -1,4 +1,4 @@
-import { Budget } from 'src/budgets';
+import { MonthlyBudget } from 'src/monthly-budgets';
 import { Category } from 'src/categories';
 import { BaseEntity } from 'src/global';
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
@@ -12,7 +12,7 @@ export class CategoryBudget extends BaseEntity {
 	@JoinColumn({ name: 'category_id' })
 	category: Category;
 
-	@ManyToOne(() => Budget, { nullable: false })
-	@JoinColumn({ name: 'budget_id' })
-	budget: Budget;
+	@ManyToOne(() => MonthlyBudget, { nullable: false })
+	@JoinColumn({ name: 'monthly_budget_id' })
+	monthlyBudget: MonthlyBudget;
 }

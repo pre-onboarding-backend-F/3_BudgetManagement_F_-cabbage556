@@ -3,7 +3,7 @@ import { User } from 'src/users';
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 
 @Entity()
-export class Budget extends BaseEntity {
+export class MonthlyBudget extends BaseEntity {
 	@Column({ type: 'smallint' })
 	year: number;
 

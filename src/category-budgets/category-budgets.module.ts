@@ -6,5 +6,6 @@ import { CategoryBudget } from './entity';
 @Module({
 	imports: [TypeOrmModule.forFeature([CategoryBudget])],
 	providers: [CategoryBudgetsService],
+	exports: [CategoryBudgetsService],
 })
 export class CategoryBudgetsModule {}

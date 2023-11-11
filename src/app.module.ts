@@ -6,8 +6,9 @@ import { UsersModule } from './users/users.module';
 import jwtConfiguration from './global/configs/jwt.configuration';
 import { AuthModule } from './auth';
 import { CategoriesModule } from './categories/categories.module';
-import { BudgetsModule } from './budgets';
+import { MonthlyBudgetsModule } from './monthly-budgets';
 import { CategoryBudgetsModule } from './category-budgets';
+import { BudgetsModule } from './budgets';
 
 @Module({
 	imports: [
@@ -22,8 +23,9 @@ import { CategoryBudgetsModule } from './category-budgets';
 		UsersModule,
 		AuthModule,
 		CategoriesModule,
-		BudgetsModule,
+		MonthlyBudgetsModule,
 		CategoryBudgetsModule,
+		BudgetsModule,
 	],
 })
 export class AppModule {}
