@@ -5,6 +5,7 @@ import { validationSchema } from './global/configs/validation.schema';
 import { UsersModule } from './users/users.module';
 import jwtConfiguration from './global/configs/jwt.configuration';
 import { AuthModule } from './auth';
+import { CategoriesModule } from './categories/categories.module';
 
 @Module({
 	imports: [
@@ -18,6 +19,7 @@ import { AuthModule } from './auth';
 		DatabaseModule,
 		UsersModule,
 		AuthModule,
+		CategoriesModule,
 	],
 })
 export class AppModule {}
