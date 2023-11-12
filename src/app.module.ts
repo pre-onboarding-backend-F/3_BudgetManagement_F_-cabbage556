@@ -9,6 +9,9 @@ import { CategoriesModule } from './categories/categories.module';
 import { MonthlyBudgetsModule } from './monthly-budgets';
 import { CategoryBudgetsModule } from './category-budgets';
 import { BudgetsModule } from './budgets';
+import { ExpensesModule } from './expenses';
+import { MonthlyExpensesModule } from './monthly-expenses';
+import { CategoryExpensesModule } from './category-expenses';
 
 @Module({
 	imports: [
@@ -26,6 +29,9 @@ import { BudgetsModule } from './budgets';
 		MonthlyBudgetsModule,
 		CategoryBudgetsModule,
 		BudgetsModule,
+		ExpensesModule,
+		MonthlyExpensesModule,
+		CategoryExpensesModule,
 	],
 })
 export class AppModule {}
