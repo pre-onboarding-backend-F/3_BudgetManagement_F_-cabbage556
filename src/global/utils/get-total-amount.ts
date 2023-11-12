@@ -1,9 +1,4 @@
-import { CategoryName } from '../enums';
-
-type LowercaseCategoryNameKeys = Lowercase<keyof typeof CategoryName>;
-type CategoriesAmount = {
-	[key in LowercaseCategoryNameKeys]: number;
-};
+import { CategoriesAmount } from '../types';
 
 export function getTotalAmount(categoriesAmount: CategoriesAmount): number {
 	let totalAmount = 0;
