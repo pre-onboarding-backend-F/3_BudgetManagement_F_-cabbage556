@@ -5,3 +5,4 @@ export * from './filters';
 export * from './interceptors';
 export * from './interfaces';
 export * from './enums';
+export * from './utils';
