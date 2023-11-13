@@ -215,4 +215,21 @@ export class ExpensesService {
 		categoryExpense.monthlyExpense.totalAmount -= categoryExpense.amount;
 		await this.monthlyExpensesService.saveOne(categoryExpense.monthlyExpense);
 	}
+
+	async getExpense(id: string, user: User) {
+		const categoryExpense = await this.categoryExpensesService.findOne(
+			{ id },
+			{ monthlyExpense: { user: true }, category: true },
+		);
+		if (!categoryExpense) {
+			throw new NotFoundException(ExpenseException.NOT_FOUND);
+		}
+
+		const userIdMatched = categoryExpense.monthlyExpense.user.id === user.id;
+		if (!userIdMatched) {
+			throw new UnauthorizedException(ExpenseException.CANNT_GET_OTHERS);
+		}
+
+		return categoryExpense;
+	}
 }

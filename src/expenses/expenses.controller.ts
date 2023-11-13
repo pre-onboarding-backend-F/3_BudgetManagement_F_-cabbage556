@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { ExpensesService } from './expenses.service';
 import { CreateExpenseDto, UpdateExpenseDto } from './dto';
 import { GetUser, ResponseMessage } from 'src/global';
@@ -40,5 +40,14 @@ export class ExpensesController {
 		@GetUser() user: User,
 	) {
 		return await this.expensesService.deleteExpense(id, user);
+	}
+
+	@Get(':id')
+	@ResponseMessage(ExpenseResponse.GET_EXPENSE)
+	async getExpense(
+		@Param('id', InvalidParseUUIDPipe) id: string, //
+		@GetUser() user: User,
+	) {
+		return await this.expensesService.getExpense(id, user);
 	}
 }
