@@ -1,6 +1,5 @@
 import { Category } from 'src/categories';
 import { BaseEntity } from 'src/global';
-import { MonthlyBudget } from 'src/monthly-budgets';
 import { MonthlyExpense } from 'src/monthly-expenses';
 import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
 
@@ -18,11 +17,11 @@ export class CategoryExpense extends BaseEntity {
 	@Column()
 	excludingInTotal: boolean;
 
-	@ManyToOne(() => MonthlyBudget, { nullable: false })
-	@JoinColumn()
+	@ManyToOne(() => MonthlyExpense, { nullable: false })
+	@JoinColumn({ name: 'monthly_expense_id' })
 	monthlyExpense: MonthlyExpense;
 
 	@ManyToOne(() => Category, { nullable: false })
-	@JoinColumn()
+	@JoinColumn({ name: 'category_id' })
 	category: Category;
 }

@@ -6,5 +6,5 @@ export function getLowercaseCategoryNameEnumKey(categoryName: string): string {
 	const index = categoryNameValues.indexOf(
 		categoryName as unknown as CategoryName, //
 	);
-	return categoryNameKeys[index].toLowerCase();
+	return categoryNameKeys[index]?.toLowerCase();
 }
