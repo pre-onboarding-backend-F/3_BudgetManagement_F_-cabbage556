@@ -47,4 +47,8 @@ export class CategoryExpensesService {
 	async updateOne(id: string, partialCategoryExpense: QueryPartialEntity<CategoryExpense>) {
 		await this.categoryExpensesRepository.update({ id }, partialCategoryExpense);
 	}
+
+	async softDeleteOne(where: FindOptionsWhere<CategoryExpense>) {
+		await this.categoryExpensesRepository.softDelete(where);
+	}
 }

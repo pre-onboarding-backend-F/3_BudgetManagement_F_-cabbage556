@@ -196,4 +196,23 @@ export class ExpensesService {
 
 		return dateMatched && categoryNameMatched && amountMatched && memoMatched && excludingInTotalMatched;
 	}
+
+	async deleteExpense(id: string, user: User) {
+		const categoryExpense = await this.categoryExpensesService.findOne({ id }, { monthlyExpense: { user: true } });
+		if (!categoryExpense) {
+			throw new NotFoundException(ExpenseException.NOT_FOUND);
+		}
+
+		const userIdMatched = categoryExpense.monthlyExpense.user.id === user.id;
+		if (!userIdMatched) {
+			throw new UnauthorizedException(ExpenseException.CANNOT_DELETE_OTHERS);
+		}
+
+		// 카테고리별 지출 삭제
+		await this.categoryExpensesService.softDeleteOne({ id });
+
+		// 월별 지출 전체 금액 업데이트
+		categoryExpense.monthlyExpense.totalAmount -= categoryExpense.amount;
+		await this.monthlyExpensesService.saveOne(categoryExpense.monthlyExpense);
+	}
 }
