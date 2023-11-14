@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { CategoryExpense, CategoryExpensesService } from 'src/category-expenses';
 import { MonthlyExpense, MonthlyExpensesService } from 'src/monthly-expenses';
-import { CreateExpenseDto, UpdateExpenseDto } from './dto';
+import { CreateExpenseDto, GetExpensesQueryDto, UpdateExpenseDto } from './dto';
 import { User } from 'src/users';
 import { YearMonthDay, getDate } from 'src/global';
 import { CategoriesService } from 'src/categories';
@@ -231,5 +231,185 @@ export class ExpensesService {
 		}
 
 		return categoryExpense;
+	}
+
+	async getExpenses(getExpensesQueryDto: GetExpensesQueryDto, user: User) {
+		const { startDate, endDate, category, minAmount, maxAmount } = getExpensesQueryDto;
+		const { year: startYear, month: startMonth, day: startDay } = getDate(startDate);
+		const { year: endYear, month: endMonth, day: endDay } = getDate(endDate);
+
+		// 시작 년도와 종료 년도, 시작 월과 종료 월 사이에 존재하는 월별 지출 조회
+		const monthlyExpenses = await this.monthlyExpensesService.findMonthlyExpenses(
+			{ year: startYear, month: startMonth },
+			{ year: endYear, month: endMonth },
+			{ category, minAmount, maxAmount },
+			user,
+		);
+
+		// 시작 일과 종료 일 범위 바깥에 있는 카테고리별 지출 필터링
+		monthlyExpenses.forEach(
+			this.filterOutsideDateRange2({ month: startMonth, day: startDay }, { month: endMonth, day: endDay }),
+		);
+
+		// 월별 지출 합계 계산
+		const monthlySums = new Map<string, number>(); // 조회 기간 동안의 월별 지출 합계 { '2023-11': 11월 지출 금액, '2023-12': 12월 지출 금액, ... }
+		monthlyExpenses.forEach(this.caculateMonthlySums2(monthlySums));
+
+		// 각 카테고리별 지출의 합계 계산
+		const categorySums = new Map<string, number>(); // 조회 기간 동안의 각 카테고리별 지출 합계 { '음식': 200000, '교통': 200000, ... }
+		monthlyExpenses.forEach(this.calculateCategorySums2(categorySums));
+
+		// 지출 기록, 월별 지출 합계, 각 카테고리별 지출 합계 리턴
+		return {
+			expenses: monthlyExpenses,
+			sums: {
+				months: monthlySums,
+				category: categorySums,
+			},
+		};
+	}
+
+	filterOutsideDateRange(
+		monthlyExpenses: MonthlyExpense[],
+		startDate: Omit<YearMonthDay, 'year'>,
+		endDate: Omit<YearMonthDay, 'year'>,
+	) {
+		const { month: startMonth, day: startDay } = startDate;
+		const { month: endMonth, day: endDay } = endDate;
+
+		// 시작 날짜와 종료 날짜 사이에 존재하는 카테고리별 지출만 월별 지출에 할당
+		monthlyExpenses.forEach((monthlyExpense) => {
+			const equalToStartMonth = monthlyExpense.month === startMonth;
+			const equalToEndMonth = monthlyExpense.month === endMonth;
+
+			const categoryExpensesBetweenDates = monthlyExpense.categoryExpenses.filter((categoryExpense) => {
+				// 시작 월의 경우 startDay보다 작은 날짜는 필터링
+				const beforeStartDay = categoryExpense.date < startDay;
+				if (equalToStartMonth && beforeStartDay) {
+					return false;
+				}
+
+				// 종료 월의 경우 endDay보다 큰 날짜는 필터링
+				const afterEndDay = categoryExpense.date > endDay;
+				if (equalToEndMonth && afterEndDay) {
+					return false;
+				}
+
+				return true;
+			});
+
+			monthlyExpense.categoryExpenses = categoryExpensesBetweenDates;
+		});
+	}
+
+	filterOutsideDateRange2(startDate: Omit<YearMonthDay, 'year'>, endDate: Omit<YearMonthDay, 'year'>) {
+		const { month: startMonth, day: startDay } = startDate;
+		const { month: endMonth, day: endDay } = endDate;
+
+		return (monthlyExpense: MonthlyExpense) => {
+			const equalToStartMonth = monthlyExpense.month === startMonth;
+			const equalToEndMonth = monthlyExpense.month === endMonth;
+
+			const categoryExpensesBetweenDates = monthlyExpense.categoryExpenses.filter((categoryExpense) => {
+				// 시작 월의 경우 startDay보다 작은 날짜는 필터링
+				const beforeStartDay = categoryExpense.date < startDay;
+				if (equalToStartMonth && beforeStartDay) {
+					return false;
+				}
+
+				// 종료 월의 경우 endDay보다 큰 날짜는 필터링
+				const afterEndDay = categoryExpense.date > endDay;
+				if (equalToEndMonth && afterEndDay) {
+					return false;
+				}
+
+				return true;
+			});
+
+			monthlyExpense.categoryExpenses = categoryExpensesBetweenDates;
+		};
+	}
+
+	calculateMonthlySums(monthlyExpenses: MonthlyExpense[], monthlySums: Map<string, number>) {
+		monthlyExpenses.forEach((monthlyExpense) => {
+			// 응답에서 월별 지출 전체 금액 제거
+			delete monthlyExpense.totalAmount;
+
+			// 월별 지출 합계 키: 'yyyy-mm'
+			const yearMonth = `${monthlyExpense.year}-${monthlyExpense.month}`;
+
+			// 월별 지출 합계 계산
+			monthlyExpense.categoryExpenses.forEach((categoryExpense) => {
+				let monthlySum = monthlySums.get(yearMonth) ?? 0;
+
+				// 지출 합계제외 여부가 true이면 합계 계산 시 제외
+				if (!categoryExpense.excludingInTotal) {
+					monthlySum += categoryExpense.amount;
+				}
+
+				monthlySums.set(yearMonth, monthlySum);
+			});
+		});
+	}
+
+	caculateMonthlySums2(monthlySums: Map<string, number>) {
+		return (monthlyExpense: MonthlyExpense) => {
+			// 응답에서 월별 지출 전체 금액 제거
+			delete monthlyExpense.totalAmount;
+
+			// 월별 지출 합계 키: 'yyyy-mm'
+			const yearMonth = `${monthlyExpense.year}-${monthlyExpense.month}`;
+
+			// 월별 지출 합계 계산
+			monthlyExpense.categoryExpenses.forEach((categoryExpense) => {
+				let monthlySum = monthlySums.get(yearMonth) ?? 0;
+
+				// 지출 합계제외 여부가 true이면 합계 계산 시 제외
+				if (!categoryExpense.excludingInTotal) {
+					monthlySum += categoryExpense.amount;
+				}
+
+				monthlySums.set(yearMonth, monthlySum);
+			});
+		};
+	}
+
+	calculateCategorySums(monthlyExpenses: MonthlyExpense[], categorySums: Map<string, number>) {
+		// 카테고리별 지출 합계 계산
+		monthlyExpenses.forEach((monthlyExpense) => {
+			monthlyExpense.categoryExpenses.forEach((categoryExpense) => {
+				// 카테고리별 지출 합계 키: 카테고리 이름
+				const categoryName = categoryExpense.category.name;
+				let categorySum = categorySums.get(categoryName) ?? 0;
+
+				// 지출 합계제외 여부가 true이면 합계 계산 시 제외
+				if (!categoryExpense.excludingInTotal) {
+					categorySum += categoryExpense.amount;
+				}
+
+				if (categorySum !== 0) {
+					categorySums.set(categoryName, categorySum);
+				}
+			});
+		});
+	}
+
+	calculateCategorySums2(categorySums: Map<string, number>) {
+		return (monthlyExpense: MonthlyExpense) => {
+			monthlyExpense.categoryExpenses.forEach((categoryExpense) => {
+				// 카테고리별 지출 합계 키: 카테고리 이름
+				const categoryName = categoryExpense.category.name;
+				let categorySum = categorySums.get(categoryName) ?? 0;
+
+				// 지출 합계제외 여부가 true이면 합계 계산 시 제외
+				if (!categoryExpense.excludingInTotal) {
+					categorySum += categoryExpense.amount;
+				}
+
+				if (categorySum !== 0) {
+					categorySums.set(categoryName, categorySum);
+				}
+			});
+		};
 	}
 }

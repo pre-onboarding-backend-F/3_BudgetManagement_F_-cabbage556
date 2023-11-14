@@ -1,6 +1,6 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { ExpensesService } from './expenses.service';
-import { CreateExpenseDto, UpdateExpenseDto } from './dto';
+import { CreateExpenseDto, GetExpensesQueryDto, UpdateExpenseDto } from './dto';
 import { GetUser, ResponseMessage } from 'src/global';
 import { User } from 'src/users';
 import { ExpenseResponse } from './enums';
@@ -40,6 +40,15 @@ export class ExpensesController {
 		@GetUser() user: User,
 	) {
 		return await this.expensesService.deleteExpense(id, user);
+	}
+
+	@Get()
+	@ResponseMessage(ExpenseResponse.GET_EXPENSES)
+	async getExpenses(
+		@Query() getExpensesQueryDto: GetExpensesQueryDto, //
+		@GetUser() user: User,
+	) {
+		return await this.expensesService.getExpenses(getExpensesQueryDto, user);
 	}
 
 	@Get(':id')
