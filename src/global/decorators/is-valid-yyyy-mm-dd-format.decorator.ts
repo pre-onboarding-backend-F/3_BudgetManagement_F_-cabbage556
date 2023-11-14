@@ -10,7 +10,6 @@ export function IsOnlyYYYYMMDD(validationOptions?: ValidationOptions) {
 			propertyName: propertyName,
 			constraints: [],
 			options: {
-				message: 'yyyy_mm_dd 필드에 2020-12-30 형식의 년도, 월, 일을 입력해야 합니다.',
 				...validationOptions,
 			},
 			validator: {
@@ -23,10 +22,10 @@ export function IsOnlyYYYYMMDD(validationOptions?: ValidationOptions) {
 	};
 }
 
-export function IsValidYYYYMMDDFormat() {
+export function IsValidYYYYMMDDFormat(exposePropertyName: string) {
 	return applyDecorators(
-		Expose({ name: 'yyyy_mm_dd' }),
-		IsNotEmpty({ message: 'yyyy_mm_dd 필드는 필수 입력 필드입니다.' }),
-		IsOnlyYYYYMMDD(),
+		Expose({ name: exposePropertyName }),
+		IsNotEmpty({ message: `${exposePropertyName} 필드는 필수 입력 필드입니다.` }),
+		IsOnlyYYYYMMDD({ message: `${exposePropertyName} 필드에 2020-12-30 형식의 년도, 월, 일을 입력해야 합니다.` }),
 	);
 }

@@ -4,14 +4,14 @@ import { IsValidCategoryString } from '../classes';
 import { Transform } from 'class-transformer';
 
 export class CreateExpenseDto {
-	@IsValidYYYYMMDDFormat()
+	@IsValidYYYYMMDDFormat('yyyy_mm_dd')
 	yyyyMMDD: string;
 
 	@IsNotEmpty({ message: '$property 필드는 필수 입력 필드입니다.' })
 	@Validate(IsValidCategoryString)
 	category: string;
 
-	@IsValidAmount()
+	@IsValidAmount('amount')
 	amount: number;
 
 	@IsNotEmpty({ message: '$property 필드는 필수 입력 필드입니다.' })

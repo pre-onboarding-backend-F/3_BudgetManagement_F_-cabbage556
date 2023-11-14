@@ -1,6 +1,7 @@
+import { CategoryExpense } from 'src/category-expenses';
 import { BaseEntity } from 'src/global';
 import { User } from 'src/users';
-import { Column, Entity, JoinColumn, ManyToOne } from 'typeorm';
+import { Column, Entity, JoinColumn, ManyToOne, OneToMany } from 'typeorm';
 
 @Entity()
 export class MonthlyExpense extends BaseEntity {
@@ -16,4 +17,7 @@ export class MonthlyExpense extends BaseEntity {
 	@ManyToOne(() => User, { nullable: false })
 	@JoinColumn({ name: 'user_id' })
 	user: User;
+
+	@OneToMany(() => CategoryExpense, (categoryExpense) => categoryExpense.monthlyExpense)
+	categoryExpenses: CategoryExpense[];
 }
