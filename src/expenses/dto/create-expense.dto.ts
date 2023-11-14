@@ -11,7 +11,7 @@ export class CreateExpenseDto {
 	@Validate(IsValidCategoryString)
 	category: string;
 
-	@IsValidAmount()
+	@IsValidAmount('amount')
 	amount: number;
 
 	@IsNotEmpty({ message: '$property 필드는 필수 입력 필드입니다.' })
