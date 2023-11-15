@@ -6,6 +6,7 @@ import { User } from 'src/users';
 import { ExpenseResponse } from './enums';
 import { AccessTokenGuard } from 'src/auth';
 import { InvalidParseUUIDPipe } from './pipes';
+import { GetExpensesQueryDtoPipe } from './pipes/get-expenses-query-dto.pipe';
 
 @Controller('expenses')
 @UseGuards(AccessTokenGuard)
@@ -45,7 +46,7 @@ export class ExpensesController {
 	@Get()
 	@ResponseMessage(ExpenseResponse.GET_EXPENSES)
 	async getExpenses(
-		@Query() getExpensesQueryDto: GetExpensesQueryDto, //
+		@Query(GetExpensesQueryDtoPipe) getExpensesQueryDto: GetExpensesQueryDto, //
 		@GetUser() user: User,
 	) {
 		return await this.expensesService.getExpenses(getExpensesQueryDto, user);
