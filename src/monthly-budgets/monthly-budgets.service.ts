@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { FindOptionsWhere, Repository } from 'typeorm';
+import { FindOptionsRelations, FindOptionsWhere, Repository } from 'typeorm';
 import { MonthlyBudget } from './entity';
 
 @Injectable()
@@ -10,8 +10,11 @@ export class MonthlyBudgetsService {
 		private readonly monthlyBudgetsRepository: Repository<MonthlyBudget>, //
 	) {}
 
-	async findOne(where: FindOptionsWhere<MonthlyBudget>): Promise<MonthlyBudget> {
-		return await this.monthlyBudgetsRepository.findOne({ where });
+	async findOne(
+		where: FindOptionsWhere<MonthlyBudget>,
+		relations?: FindOptionsRelations<MonthlyBudget>,
+	): Promise<MonthlyBudget> {
+		return await this.monthlyBudgetsRepository.findOne({ where, relations });
 	}
 
 	createOne({ year, month, totalAmount, user }: Partial<MonthlyBudget>): MonthlyBudget {

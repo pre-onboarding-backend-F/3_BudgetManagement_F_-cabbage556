@@ -1,18 +1,26 @@
-import { BadRequestException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import {
+	BadRequestException,
+	Injectable,
+	NotFoundException,
+	UnauthorizedException,
+	UnprocessableEntityException,
+} from '@nestjs/common';
 import { CategoryExpense, CategoryExpensesService } from 'src/category-expenses';
 import { MonthlyExpense, MonthlyExpensesService } from 'src/monthly-expenses';
 import { CreateExpenseDto, GetExpensesQueryDto, UpdateExpenseDto } from './dto';
 import { User } from 'src/users';
-import { YearMonthDay, getDate } from 'src/global';
+import { YearMonthDay, getDate, getToday } from 'src/global';
 import { CategoriesService } from 'src/categories';
 import { ExpenseException } from './enums';
+import { MonthlyBudgetsService } from 'src/monthly-budgets';
 
 @Injectable()
 export class ExpensesService {
 	constructor(
 		private readonly monthlyExpensesService: MonthlyExpensesService,
 		private readonly categoryExpensesService: CategoryExpensesService,
-		private readonly categoriesService: CategoriesService, //
+		private readonly categoriesService: CategoriesService,
+		private readonly monthlyBudgetsService: MonthlyBudgetsService,
 	) {}
 
 	async createExpense(createExpenseDto: CreateExpenseDto, user: User) {
@@ -227,7 +235,7 @@ export class ExpensesService {
 
 		const userIdMatched = categoryExpense.monthlyExpense.user.id === user.id;
 		if (!userIdMatched) {
-			throw new UnauthorizedException(ExpenseException.CANNT_GET_OTHERS);
+			throw new UnauthorizedException(ExpenseException.CANNOT_GET_OTHERS);
 		}
 
 		return categoryExpense;
@@ -410,6 +418,100 @@ export class ExpensesService {
 					categorySums.set(categoryName, categorySum);
 				}
 			});
+		};
+	}
+
+	async getTodayExpensesSummary(user: User) {
+		const { year, month, day } = getToday();
+
+		// 오늘 기준 월별 예산
+		const monthlyBudget = await this.monthlyBudgetsService.findOne(
+			{ year, month, user: { id: user.id } },
+			{ categoryBudgets: { category: true } },
+		);
+		if (!monthlyBudget) {
+			throw new UnprocessableEntityException(
+				`${ExpenseException.BUDGET_NOT_FOUND} ${ExpenseException.CANNOT_MAKE_TODAY_SUMMARY}`,
+			);
+		}
+
+		// 오늘 기준 월별 지출
+		const monthlyExpense = await this.monthlyExpensesService.findOne(
+			{ year, month, user: { id: user.id } },
+			{ categoryExpenses: { category: true } },
+		);
+		if (!monthlyExpense) {
+			throw new UnprocessableEntityException(
+				`${ExpenseException.NOT_FOUND} ${ExpenseException.CANNOT_MAKE_TODAY_SUMMARY}`,
+			);
+		}
+
+		// 오늘이 아닌 지출 기록은 필터링
+		const todayExpenses = monthlyExpense.categoryExpenses.filter((categoryExpense) => categoryExpense.date === day);
+
+		// 오늘 지출 금액 합계, 오늘 적정 지출 금액, 오늘 위험도 계산
+		const todaySum = todayExpenses.reduce((acc, curr) => (acc += curr.excludingInTotal ? 0 : curr.amount), 0);
+		const { properAmount: todayProperAmount, risk: todayRisk } = this.getProperAmountAndRisk(
+			monthlyBudget.totalAmount,
+			todaySum,
+		);
+
+		// 오늘 전체 지출 요약
+		const todayTotalSummary = {
+			sum: todaySum,
+			proper: todayProperAmount,
+			risk: todayRisk,
+		};
+
+		// 카테고리별 지출 금액 합계 계산
+		const todayCategorySums = new Map<string, number>();
+		todayExpenses.forEach((todayExpense) => {
+			const categoryName = todayExpense.category.name;
+
+			let todayCategorySum = todayCategorySums.get(categoryName) ?? 0;
+			if (!todayExpense.excludingInTotal) {
+				todayCategorySum += todayExpense.amount;
+			}
+			if (todayCategorySum !== 0) {
+				todayCategorySums.set(categoryName, todayCategorySum);
+			}
+		});
+
+		// 카테고리별 지출 요약
+		const todayCategorySummary = {};
+
+		// 카테고리별 적정 지출 금액, 위험도 계산
+		todayCategorySums.forEach((todayCategorySum, categoryName) => {
+			// 카테고리별 지출 금액에 존재하는 카테고리에 해당하는 예산
+			const categoryBudgetAmount = monthlyBudget.categoryBudgets.find(
+				(categoryBudget) => categoryBudget.category.name === categoryName,
+			).amount;
+			// 카테고리별 적정 지출 금액, 위험도 계산
+			const { properAmount: categoryProperAmount, risk: categoryRisk } = this.getProperAmountAndRisk(
+				categoryBudgetAmount,
+				todayCategorySum,
+			);
+
+			// 카테고리 이름을 키로, 요약 객체를 값으로 할당
+			todayCategorySummary[categoryName] = {
+				sum: todayCategorySum,
+				proper: categoryProperAmount,
+				risk: categoryRisk,
+			};
+		});
+
+		return {
+			total_summary: todayTotalSummary,
+			category_summary: todayCategorySummary,
+		};
+	}
+
+	getProperAmountAndRisk(budgetAmount: number, expenseAmount: number) {
+		const properAmount = Math.floor(budgetAmount / 30 / 100) * 100;
+		const risk = Math.floor((expenseAmount / properAmount) * 100);
+		return {
+			properAmount,
+			risk,
 		};
 	}
 }

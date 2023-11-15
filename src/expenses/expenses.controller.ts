@@ -52,6 +52,14 @@ export class ExpensesController {
 		return await this.expensesService.getExpenses(getExpensesQueryDto, user);
 	}
 
+	@Get('consult/summary')
+	@ResponseMessage(ExpenseResponse.GET_TODAY_EXPENSES_SUMMARY)
+	async getTodayExpensesSummary(
+		@GetUser() user: User, //
+	) {
+		return await this.expensesService.getTodayExpensesSummary(user);
+	}
+
 	@Get(':id')
 	@ResponseMessage(ExpenseResponse.GET_EXPENSE)
 	async getExpense(

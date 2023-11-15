@@ -4,27 +4,27 @@ export class SetBudgetDto {
 	@IsValidYYYYMMFormat()
 	yyyyMM: string;
 
-	@IsValidAmount()
+	@IsValidAmount('food')
 	food: number;
 
-	@IsValidAmount()
+	@IsValidAmount('cafe')
 	cafe: number;
 
-	@IsValidAmount()
+	@IsValidAmount('transport')
 	transport: number;
 
-	@IsValidAmount()
+	@IsValidAmount('living')
 	living: number;
 
-	@IsValidAmount()
+	@IsValidAmount('shop')
 	shop: number;
 
-	@IsValidAmount()
+	@IsValidAmount('hobby')
 	hobby: number;
 
-	@IsValidAmount()
+	@IsValidAmount('health')
 	health: number;
 
-	@IsValidAmount()
+	@IsValidAmount('culture')
 	culture: number;
 }
