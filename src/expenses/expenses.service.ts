@@ -31,8 +31,13 @@ export class ExpensesService {
 
 		// 월별 지출이 존재하는 경우
 		if (oldMonthlyExpense) {
-			// 월별 지출 전체 금액 업데이트, 카테고리별 지출 생성 후 저장
-			const monthlyExpense = await this.updateMonthlyExpenseTotalAmount(oldMonthlyExpense, { amount, exclude });
+			// 지출 합계제외 여부가 false인 경우 월별 지출 전체 금액 업데이트
+			let monthlyExpense = oldMonthlyExpense;
+			if (!exclude) {
+				monthlyExpense = await this.updateMonthlyExpenseTotalAmount(monthlyExpense, { amount });
+			}
+
+			// 카테고리별 지출 생성 후 저장
 			const categoryExpense = await this.saveNewCategoryExpense(
 				monthlyExpense,
 				{ day },
@@ -66,12 +71,10 @@ export class ExpensesService {
 		monthlyExpense: MonthlyExpense,
 		partialDto: Partial<Omit<CreateExpenseDto, 'yyyyMMDD'>>,
 	) {
-		const { amount, exclude } = partialDto;
+		const { amount } = partialDto;
 
-		// 지출 합계제외 여부가 false인 경우 월별 지출 전체 금액 업데이트
-		if (!exclude) {
-			monthlyExpense.totalAmount += amount;
-		}
+		// 월별 지출 전체 금액 업데이트
+		monthlyExpense.totalAmount += amount;
 
 		return await this.monthlyExpensesService.saveOne(monthlyExpense);
 	}
@@ -121,12 +124,6 @@ export class ExpensesService {
 	}
 
 	async updateExpense(id: string, updateExpenseDto: UpdateExpenseDto, user: User) {
-		// id에 해당하는 카테고리별 지출을 찾을 수 없으면 NotFound 예외를 던짐
-		const categoryExpenseExists = await this.categoryExpensesService.exists({ id });
-		if (!categoryExpenseExists) {
-			throw new NotFoundException(ExpenseException.NOT_FOUND);
-		}
-
 		const categoryExpense = await this.categoryExpensesService.findOne(
 			{ id },
 			{
@@ -136,6 +133,9 @@ export class ExpensesService {
 				category: true,
 			},
 		);
+		if (!categoryExpense) {
+			throw new NotFoundException(ExpenseException.NOT_FOUND);
+		}
 
 		// 요청한 유저의 월별 지출이 아니라면 수정할 수 없으므로 Unauthorized 예외를 던짐
 		const userIdMatched = categoryExpense.monthlyExpense.user.id === user.id;
@@ -148,9 +148,9 @@ export class ExpensesService {
 
 		// 수정할 날짜로 전달한 year, month가 월별 지출의 year, month와 일치하지 않는 경우 업데이트할 수 없으므로 BadRequest 예외를 던짐
 		// year, month가 월별 지출의 year, month와 일치하지 않는 경우라면 지출 기록을 새롭게 생성해야 함
-		const yearMonthNotMatched = this.checkYearMonthNotMatched(categoryExpense.monthlyExpense, { year, month });
-		if (yearMonthNotMatched) {
-			throw new BadRequestException(ExpenseException.INVALID_YEAR_MONTH);
+		const yearMonthMatched = this.checkYearMonthMatched(categoryExpense.monthlyExpense, { year, month });
+		if (!yearMonthMatched) {
+			throw new BadRequestException(ExpenseException.YEAR_MONTH_NOT_MATCHED);
 		}
 
 		// 수정할 필요가 없다면 수정하지 않음
@@ -162,7 +162,7 @@ export class ExpensesService {
 			exclude: excludingInTotal,
 		});
 		if (valuesMatched) {
-			return '수정할 값이 없습니다.';
+			return;
 		}
 
 		// 카테고리별 지출 업데이트
@@ -179,21 +179,68 @@ export class ExpensesService {
 			category,
 		});
 
-		// 월별 지출 전체 금액 업데이트
+		// dto의 지출 합계제외 여부: true / 기존의 지출 합계제외 여부: true
+		// 월별 지출 전체 금액을 업데이트하지 않음
+		if (excludingInTotal && categoryExpense.excludingInTotal) {
+			return {
+				monthlyExpense: await this.monthlyExpensesService.findOne({ id: categoryExpense.monthlyExpense.id }),
+				categoryExpense: await this.categoryExpensesService.findOne(
+					{ id: categoryExpense.id },
+					{ category: true },
+				),
+			};
+		}
+
+		// dto의 지출 합계제외 여부: true / 기존의 지출 합계제외 여부: false
+		// 월별 지출 전체 금액 업데이트: 기존의 지출 금액만큼 차감
+		if (excludingInTotal && !categoryExpense.excludingInTotal) {
+			return {
+				monthlyExpense: await this.updateMonthlyExpenseTotalAmount(
+					categoryExpense.monthlyExpense, //
+					{ amount: -categoryExpense.amount },
+				),
+				categoryExpense: await this.categoryExpensesService.findOne(
+					{ id: categoryExpense.id },
+					{ category: true },
+				),
+			};
+		}
+
+		// dto의 지출 합계제외 여부: false / 기존의 지출 합계제외 여부: true
+		// 월별 지출 전체 금액 업데이트: dto의 지출 금액만큼 합산
+		if (!excludingInTotal && categoryExpense.excludingInTotal) {
+			return {
+				monthlyExpense: await this.updateMonthlyExpenseTotalAmount(
+					categoryExpense.monthlyExpense, //
+					{ amount },
+				),
+				categoryExpense: await this.categoryExpensesService.findOne(
+					{ id: categoryExpense.id },
+					{ category: true },
+				),
+			};
+		}
+
+		// dto의 지출 합계제외 여부: false  / 기존의 지출 합계제외 여부: false
+		// 월별 지출 전체 금액 업데이트: dto의 지출 금액 - 기존의 지출 금액만큼 합산
 		const amountDifference = amount - categoryExpense.amount;
 
 		return {
-			monthlyExpense: await this.updateMonthlyExpenseTotalAmount(categoryExpense.monthlyExpense, {
-				amount: amountDifference,
-			}),
-			categoryExpense: await this.categoryExpensesService.findOne({ id: categoryExpense.id }, { category: true }),
+			monthlyExpense: await this.updateMonthlyExpenseTotalAmount(
+				categoryExpense.monthlyExpense, //
+				{ amount: amountDifference },
+			),
+			categoryExpense: await this.categoryExpensesService.findOne(
+				{ id: categoryExpense.id }, //
+				{ category: true },
+			),
 		};
 	}
 
-	checkYearMonthNotMatched(monthlyExpense: MonthlyExpense, yearMonth: Omit<YearMonthDay, 'day'>): boolean {
-		const yearNotMatched = monthlyExpense.year !== yearMonth.year;
-		const monthNotMatched = monthlyExpense.month !== yearMonth.month;
-		return yearNotMatched || monthNotMatched;
+	checkYearMonthMatched(monthlyExpense: MonthlyExpense, yearMonth: Omit<YearMonthDay, 'day'>): boolean {
+		const yearMatched = monthlyExpense.year === yearMonth.year;
+		const monthMatched = monthlyExpense.month === yearMonth.month;
+		return yearMatched && monthMatched;
 	}
 
 	checkValuesMatched(
