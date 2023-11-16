@@ -9,4 +9,5 @@ export enum ExpenseException {
 	INVALID_MIN_AMOUNT = '최소 금액이 최대 금액보다 클 수 없습니다.',
 	BUDGET_NOT_FOUND = '예산이 존재하지 않습니다.',
 	CANNOT_MAKE_TODAY_SUMMARY = '오늘 지출 안내 내용을 생성할 수 없습니다.',
+	CANNOT_MAKE_TODAY_RECOMMEND = '오늘 지출 추천 내용을 생성할 수 없습니다.',
 }

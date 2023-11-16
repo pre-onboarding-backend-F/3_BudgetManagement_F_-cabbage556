@@ -11,7 +11,7 @@ import { CreateExpenseDto, GetExpensesQueryDto, UpdateExpenseDto } from './dto';
 import { User } from 'src/users';
 import { YearMonthDay, getDate, getToday } from 'src/global';
 import { CategoriesService } from 'src/categories';
-import { ExpenseException } from './enums';
+import { ExpenseException, RecommendMessage } from './enums';
 import { MonthlyBudgetsService } from 'src/monthly-budgets';
 
 @Injectable()
@@ -506,12 +506,132 @@ export class ExpensesService {
 		};
 	}
 
-	getProperAmountAndRisk(budgetAmount: number, expenseAmount: number) {
-		const properAmount = Math.floor(budgetAmount / 30 / 100) * 100;
+	getProperAmountAndRisk(budgetAmount: number, expenseAmount: number, day = 0) {
+		const properAmount = Math.floor(budgetAmount / (30 - day) / 100) * 100;
 		const risk = Math.floor((expenseAmount / properAmount) * 100);
 		return {
 			properAmount,
 			risk,
+		};
+	}
+
+	async getTodayExpensesRecommend(user: User) {
+		const { year, month, day } = getToday();
+
+		const monthlyBudget = await this.monthlyBudgetsService.findOne(
+			{ year, month, user: { id: user.id } },
+			{ categoryBudgets: { category: true } },
+		);
+		if (!monthlyBudget) {
+			throw new UnprocessableEntityException(
+				`${ExpenseException.BUDGET_NOT_FOUND} ${ExpenseException.CANNOT_MAKE_TODAY_RECOMMEND}`,
+			);
+		}
+
+		const monthlyExpense = await this.monthlyExpensesService.findOne(
+			{ year, month, user: { id: user.id } },
+			{ categoryExpenses: { category: true } },
+		);
+
+		// 오늘 카테고리별 지출 추천
+		const todayCategoryRecommend = {};
+
+		// 월별 예산 전체 금액에서 남은 금액이 없는지 확인
+		const budgetLeft = monthlyBudget.totalAmount > (monthlyExpense?.totalAmount ?? -Infinity);
+
+		// 월별 지출이 없는 경우(아직 지출 기록이 없는 경우) 또는 남은 금액이 없는 경우
+		if (!monthlyExpense || !budgetLeft) {
+			let recommendMessage = RecommendMessage.EXPEND_NOT_YET;
+			let currentDate = day;
+
+			if (!budgetLeft) {
+				recommendMessage = RecommendMessage.OVER_BUDGET;
+				currentDate = 0;
+			}
+
+			// 오늘 전체 지출 추천 계산
+			//		월별 지출이 없는 경우: 월별 예산 전체 금액 / 월에서 남은 일수
+			//		남은 금액이 없는 경우: 월별 예산 전체 금액 / 월의 전체 일수
+			const { properAmount: todayProperAmount } = this.getProperAmountAndRisk(
+				monthlyBudget.totalAmount,
+				0,
+				currentDate,
+			);
+
+			monthlyBudget.categoryBudgets.forEach((categoryBudget) => {
+				const categoryName = categoryBudget.category.name;
+				const categoryBudgetAmount = categoryBudget.amount;
+
+				// 오늘 카테고리별 지출 추천 계산
+				// 		월별 지출이 없는 경우: 카테고리별 예산 금액 / 월에서 남은 일수
+				//		남은 금액이 없는 경우: 카테고리별 예산 금액 / 월의 전체 일수
+				const { properAmount: categoryProperAmount } = this.getProperAmountAndRisk(
+					categoryBudgetAmount,
+					0,
+					currentDate,
+				);
+
+				// { "음식": 6600, "교통": 3300, ... }
+				todayCategoryRecommend[categoryName] = categoryProperAmount;
+			});
+
+			return {
+				recommend_message: recommendMessage,
+				total_recommend: todayProperAmount,
+				category_recommend: todayCategoryRecommend,
+			};
+		}
+
+		// 월별 지출이 존재하고 남은 금액이 존재하는 경우
+		// 오늘 전체 지출 추천 계산
+		// 		월별 지출이 존재하는 경우: 월별 남은 금액 / 월에서 남은 일수
+		const remainingTotalAmount = monthlyBudget.totalAmount - monthlyExpense.totalAmount;
+		console.log(30 - day, remainingTotalAmount);
+		const { properAmount: todayProperAmount } = this.getProperAmountAndRisk(remainingTotalAmount, 0, day);
+
+		// 카테고리별 지출 금액 합계 계산
+		const categorySums = new Map<string, number>();
+		monthlyExpense.categoryExpenses.forEach((categoryExpense) => {
+			const categoryName = categoryExpense.category.name;
+
+			let categorySum = categorySums.get(categoryName) ?? 0;
+			if (!categoryExpense.excludingInTotal) {
+				categorySum += categoryExpense.amount;
+			}
+
+			if (categorySum !== 0) {
+				categorySums.set(categoryName, categorySum);
+			}
+		});
+
+		// 오늘 카테고리별 지출 추천 계산
+		monthlyBudget.categoryBudgets.forEach((categoryBudget) => {
+			const categoryName = categoryBudget.category.name;
+
+			// 카테고리에 해당하는 지출이 없는 경우 카테고리별 지출 금액을 0으로 설정
+			const categoryExpenseAmount = categorySums.get(categoryName) ?? 0;
+
+			let remainingCategoryAmount = categoryBudget.amount - categoryExpenseAmount;
+
+			// 카테고리별 지출 금액이 카테고리별 예산 금액보다 큰 경우 0으로 설정
+			remainingCategoryAmount = remainingCategoryAmount > 0 ? remainingCategoryAmount : 0;
+			const { properAmount: categoryProperAmount } = this.getProperAmountAndRisk(remainingCategoryAmount, 0, day);
+
+			todayCategoryRecommend[categoryName] = categoryProperAmount;
+		});
+
+		// 추천 메세지 기준에 따라 추천 메세지 생성
+		//		오늘까지의 적정 금액(하루 적정 금액 * 날짜(일))이 월별 지출 전체 금액보다 크면 GOOD
+		//		오늘까지의 적정 금액이 월별 지출 전체 금액보다 작으면 BAD
+		const { properAmount } = this.getProperAmountAndRisk(monthlyBudget.totalAmount, 0);
+		const properAmountUpToNow = properAmount * day;
+		const recommendMessage =
+			properAmountUpToNow > monthlyExpense.totalAmount ? RecommendMessage.GOOD : RecommendMessage.BAD;
+
+		return {
+			recommend_message: recommendMessage,
+			total_recommend: todayProperAmount,
+			category_recommend: todayCategoryRecommend,
 		};
 	}
 }

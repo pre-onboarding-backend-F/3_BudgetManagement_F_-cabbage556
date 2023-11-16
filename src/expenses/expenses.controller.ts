@@ -60,6 +60,14 @@ export class ExpensesController {
 		return await this.expensesService.getTodayExpensesSummary(user);
 	}
 
+	@Get('consult/recommend')
+	@ResponseMessage(ExpenseResponse.GET_TODAY_EXPENSES_RECOMMEND)
+	async getTodayExpenseRecommend(
+		@GetUser() user: User, //
+	) {
+		return await this.expensesService.getTodayExpensesRecommend(user);
+	}
+
 	@Get(':id')
 	@ResponseMessage(ExpenseResponse.GET_EXPENSE)
 	async getExpense(
