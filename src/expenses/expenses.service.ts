@@ -28,29 +28,31 @@ export class ExpensesService {
 		const { year, month, day } = getDate(yyyyMMDD);
 
 		const oldMonthlyExpense = await this.monthlyExpensesService.findOne({ year, month, user: { id: user.id } });
-		// 월별 지출이 존재하는 경우 월별 지출 전체 금액 업데이트, 카테고리별 지출 생성 후 저장
+
+		// 월별 지출이 존재하는 경우
 		if (oldMonthlyExpense) {
-			const monthlyBudget = await this.updateMonthlyExpenseTotalAmount(oldMonthlyExpense, { amount });
-			const categoryExpense = await this.saveNewCategoryExpense({ day }, monthlyBudget, {
-				amount,
-				category,
-				memo,
-				exclude,
-			});
+			// 월별 지출 전체 금액 업데이트, 카테고리별 지출 생성 후 저장
+			const monthlyExpense = await this.updateMonthlyExpenseTotalAmount(oldMonthlyExpense, { amount, exclude });
+			const categoryExpense = await this.saveNewCategoryExpense(
+				monthlyExpense,
+				{ day },
+				{ amount, category, memo, exclude },
+			);
+
 			return {
-				monthlyBudget,
+				monthlyExpense,
 				categoryExpense,
 			};
 		}
-		// 월별 지출이 존재하지 않는 경우 월별 지출, 카테고리별 지출 생성 후 저장
+		// 월별 지출이 존재하지 않는 경우
 		else {
-			const monthlyExpense = await this.saveNewMonthlyExpense({ year, month }, { amount }, user);
-			const categoryExpense = await this.saveNewCategoryExpense({ day }, monthlyExpense, {
-				amount,
-				category,
-				memo,
-				exclude,
-			});
+			// 월별 지출, 카테고리별 지출 생성 후 저장
+			const monthlyExpense = await this.saveNewMonthlyExpense({ year, month }, { amount, exclude }, user);
+			const categoryExpense = await this.saveNewCategoryExpense(
+				monthlyExpense,
+				{ day },
+				{ amount, category, memo, exclude },
+			);
 
 			return {
 				monthlyExpense,
@@ -64,10 +66,13 @@ export class ExpensesService {
 		monthlyExpense: MonthlyExpense,
 		partialDto: Partial<Omit<CreateExpenseDto, 'yyyyMMDD'>>,
 	) {
-		const { amount } = partialDto;
+		const { amount, exclude } = partialDto;
 
-		// 월별 지출 전체 금액 업데이트
-		monthlyExpense.totalAmount += amount;
+		// 지출 합계제외 여부가 false인 경우 월별 지출 전체 금액 업데이트
+		if (!exclude) {
+			monthlyExpense.totalAmount += amount;
+		}
+
 		return await this.monthlyExpensesService.saveOne(monthlyExpense);
 	}
 
@@ -78,19 +83,23 @@ export class ExpensesService {
 		user: User,
 	) {
 		const { year, month } = yearMonthDay;
-		const { amount: totalAmount } = partialDto;
+		const { exclude } = partialDto;
+		let { amount: totalAmount } = partialDto;
+
+		// 지출 합계제외 여부가 true인 경우 전체 금액을 0으로 설정하여 월별 지출 생성
+		if (exclude) {
+			totalAmount = 0;
+		}
 
 		// 월별 지출 생성 후 저장
-		const createdMonthlyExpense = this.monthlyExpensesService.createOne({ year, month, totalAmount, user });
-		const monthlyExpense = await this.monthlyExpensesService.saveOne(createdMonthlyExpense);
-
-		return monthlyExpense;
+		const monthlyExpense = this.monthlyExpensesService.createOne({ year, month, totalAmount, user });
+		return await this.monthlyExpensesService.saveOne(monthlyExpense);
 	}
 
 	// 새로운 카테고리별 지출 생성 후 저장
 	async saveNewCategoryExpense(
-		yearMonthDay: Pick<YearMonthDay, 'day'>,
 		monthlyExpense: MonthlyExpense,
+		yearMonthDay: Pick<YearMonthDay, 'day'>,
 		partialDto: Partial<Omit<CreateExpenseDto, 'yyyyMMDD'>>,
 	): Promise<CategoryExpense> {
 		const { day: date } = yearMonthDay;
@@ -100,7 +109,7 @@ export class ExpensesService {
 		const category = await this.categoriesService.findOne({ name });
 
 		// 카테고리별 지출 생성 후 저장
-		const createdCategoryExpense = this.categoryExpensesService.createOne({
+		const categoryExpense = this.categoryExpensesService.createOne({
 			date,
 			memo,
 			amount,
@@ -108,9 +117,7 @@ export class ExpensesService {
 			monthlyExpense,
 			category,
 		});
-		const categoryExpense = await this.categoryExpensesService.saveOne(createdCategoryExpense);
-
-		return categoryExpense;
+		return await this.categoryExpensesService.saveOne(categoryExpense);
 	}
 
 	async updateExpense(id: string, updateExpenseDto: UpdateExpenseDto, user: User) {
@@ -123,11 +130,9 @@ export class ExpensesService {
 		const categoryExpense = await this.categoryExpensesService.findOne(
 			{ id },
 			{
-				// 월별 지출, 유저 join
 				monthlyExpense: {
 					user: true,
 				},
-				// 카테고리 join
 				category: true,
 			},
 		);
