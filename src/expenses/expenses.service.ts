@@ -271,9 +271,11 @@ export class ExpensesService {
 		// 카테고리별 지출 삭제
 		await this.categoryExpensesService.softDeleteOne({ id });
 
-		// 월별 지출 전체 금액 업데이트
-		categoryExpense.monthlyExpense.totalAmount -= categoryExpense.amount;
-		await this.monthlyExpensesService.saveOne(categoryExpense.monthlyExpense);
+		// 지출 합계제외 여부가 false인 경우 월별 지출 전체 금액 업데이트
+		if (!categoryExpense.excludingInTotal) {
+			categoryExpense.monthlyExpense.totalAmount -= categoryExpense.amount;
+			await this.monthlyExpensesService.saveOne(categoryExpense.monthlyExpense);
+		}
 	}
 
 	async getExpense(id: string, user: User) {
