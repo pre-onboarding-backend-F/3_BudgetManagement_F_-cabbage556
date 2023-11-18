@@ -1,6 +1,6 @@
-import { Body, Controller, Put, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Put, Query, UseGuards } from '@nestjs/common';
 import { BudgetsService } from './budgets.service';
-import { SetBudgetDto } from './dto';
+import { GetBudgetRecommendQueryDto, SetBudgetDto } from './dto';
 import { AccessTokenGuard } from 'src/auth';
 import { GetUser, ResponseMessage } from 'src/global';
 import { User } from 'src/users';
@@ -20,5 +20,13 @@ export class BudgetsController {
 		@GetUser() user: User,
 	) {
 		return await this.budgetsService.setBudget(setBudgetDto, user);
+	}
+
+	@Get('recommend')
+	@ResponseMessage(BudgetResponse.GET_BUDGET_RECOMMEND)
+	async getBudgetRecommend(
+		@Query() dto: GetBudgetRecommendQueryDto, //
+	) {
+		return await this.budgetsService.getBudgetRecommend(dto);
 	}
 }
