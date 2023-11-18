@@ -24,4 +24,13 @@ export class MonthlyBudgetsService {
 	async saveOne(monthlyBudget: MonthlyBudget): Promise<MonthlyBudget> {
 		return await this.monthlyBudgetsRepository.save(monthlyBudget);
 	}
+
+	async findMany(
+		where: FindOptionsWhere<MonthlyBudget>,
+		relations?: FindOptionsRelations<MonthlyBudget>,
+		take = 10,
+		skip = 0,
+	): Promise<MonthlyBudget[]> {
+		return await this.monthlyBudgetsRepository.find({ where, take, skip, relations });
+	}
 }

@@ -1,8 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { CategoryBudgetsService } from 'src/category-budgets';
 import { MonthlyBudget, MonthlyBudgetsService } from 'src/monthly-budgets';
-import { SetBudgetDto } from './dto';
-import { CategoriesAmount, getDate, getLowercaseCategoryNameEnumKey, getTotalAmount } from 'src/global';
+import { GetBudgetRecommendQueryDto, SetBudgetDto } from './dto';
+import {
+	CategoriesAmount,
+	CategoryName,
+	getDate,
+	getLowercaseCategoryNameEnumKey,
+	getToday,
+	getTotalAmount,
+} from 'src/global';
 import { User } from 'src/users';
 import { CategoriesService } from 'src/categories';
 
@@ -94,5 +101,57 @@ export class BudgetsService {
 			monthlyBudget,
 			categoryBudgets,
 		};
+	}
+
+	async getBudgetRecommend(dto: GetBudgetRecommendQueryDto) {
+		const { totalAmount } = dto;
+		const { year, month } = getToday();
+
+		const take = 50; // 기준 월별 예산 50개 선택
+		const skip = Math.floor(Math.random() * 10) + 1; // 1 ~ 10개의 월별 예산 생략
+		const monthlyBudgets = await this.monthlyBudgetsService.findMany(
+			{ year, month },
+			{ categoryBudgets: { category: true } },
+			take,
+			skip,
+		);
+
+		// 카테고리별 예산 금액의 각 퍼센트 계산
+		const categoryPercents = new Map<string, number[]>();
+		monthlyBudgets.forEach((monthlyBudget) => {
+			monthlyBudget.categoryBudgets.forEach((categoryBudget) => {
+				const categoryName = categoryBudget.category.name;
+				const percents = categoryPercents.get(categoryName) ?? [];
+				let percent = 0;
+
+				// 카테고리 이름이 '음식' 또는 '생활'인 경우 올림, 나머지의 경우 내림으로 퍼센트 계산
+				if (categoryName === CategoryName.FOOD || categoryName === CategoryName.LIVING) {
+					percent = Math.ceil((categoryBudget.amount / monthlyBudget.totalAmount) * 100);
+				} else {
+					percent = Math.floor((categoryBudget.amount / monthlyBudget.totalAmount) * 100);
+				}
+
+				percents.push(percent);
+				categoryPercents.set(categoryName, percents);
+			});
+		});
+
+		// 카테고리별 예산 금액의 각 퍼센트의 평균을 구해 카테고리별 추천 예산 금액 계산
+		let categoryTotalAmount = 0;
+		const categoryAmounts = {};
+		for (const [categoryName, percents] of categoryPercents) {
+			const categoryPercentAvg = Math.round(percents.reduce((prev, curr) => (prev += curr), 0) / percents.length); // 카테고리별 퍼센트의 평균
+			const categoryRecommendAmount = (totalAmount * categoryPercentAvg) / 100; // 카테고리별 추천 예산 금액
+			categoryAmounts[categoryName] = categoryRecommendAmount;
+			categoryTotalAmount += categoryRecommendAmount;
+		}
+
+		// 오차가 발생할 경우 '카페' 카테고리의 추천 예산 금액에 더하기
+		const amountDifference = totalAmount - categoryTotalAmount;
+		if (amountDifference > 0) {
+			categoryAmounts[CategoryName.CAFE] += amountDifference;
+		}
+
+		return categoryAmounts;
 	}
 }
