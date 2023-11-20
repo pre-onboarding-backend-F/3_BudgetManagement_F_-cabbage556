@@ -9,6 +9,7 @@ import {
 	CategoryBudgetsFactory,
 	CategoryExpensesFactory,
 	MonthlyExpensesFactory,
+	UserStatsSeeder,
 } from 'src/database';
 import { MonthlyBudget } from 'src/monthly-budgets';
 import { CategoryBudget } from 'src/category-budgets';
@@ -37,6 +38,6 @@ const options: DataSourceOptions & SeederOptions = {
 		MonthlyExpensesFactory,
 		CategoryExpensesFactory,
 	],
-	seeds: [MainSeeder],
+	seeds: [MainSeeder, UserStatsSeeder],
 };
 export const dataSource = new DataSource(options);
