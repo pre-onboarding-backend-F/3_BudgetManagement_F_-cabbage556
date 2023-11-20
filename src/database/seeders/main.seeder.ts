@@ -7,7 +7,6 @@ import { Category } from 'src/categories';
 import { MonthlyExpense } from 'src/monthly-expenses';
 import { CategoryExpense } from 'src/category-expenses';
 import { getToday } from 'src/global';
-import { faker } from '@faker-js/faker';
 
 export class MainSeeder implements Seeder {
 	async run(dataSource: DataSource, factoryManager: SeederFactoryManager): Promise<any> {
@@ -88,14 +87,14 @@ export class MainSeeder implements Seeder {
 			monthlyExpenses.map(async (monthlyExpense) => {
 				// 랜덤 카테고리별 지출 생성
 				const fakeCategoryExpenses: CategoryExpense[] = [];
-				for (let i = 0; i < day; i += 3) {
+				for (let date = 1; date <= day; date += 1) {
 					fakeCategoryExpenses.push(
 						...(await Promise.all(
 							categories.map(async (category) => {
 								return await categoryExpensesFactory.make({
 									category,
 									monthlyExpense,
-									date: faker.number.int({ min: 1, max: day }),
+									date,
 								});
 							}),
 						)),
