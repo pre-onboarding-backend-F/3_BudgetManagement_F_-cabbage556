@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { CategoryExpense } from './entity';
 import { FindOptionsRelations, FindOptionsWhere, Repository } from 'typeorm';
 import { QueryPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
+import { CategoryAndSum } from 'src/global';
 
 @Injectable()
 export class CategoryExpensesService {
@@ -42,6 +43,44 @@ export class CategoryExpensesService {
 		relations?: FindOptionsRelations<CategoryExpense>,
 	): Promise<CategoryExpense> {
 		return await this.categoryExpensesRepository.findOne({ where, relations });
+	}
+
+	async getAmountSumsUntilDate(date: number, monthlyExpenseId: string): Promise<CategoryAndSum[]> {
+		const categoryAmountSums = (await this.categoryExpensesRepository.query(
+			`SELECT
+					category.name as category,
+					SUM(amount)::int as sum
+			FROM
+					category_expense
+			LEFT JOIN
+					category on category_id = category.id
+			WHERE
+					monthly_expense_id = '${monthlyExpenseId}'
+					AND date <= ${date}
+					AND excluding_in_total = false
+			GROUP BY
+					category.name`,
+		)) as CategoryAndSum[];
+		return categoryAmountSums;
+	}
+
+	async getAmountSumsAtDate(date: number, monthlyExpenseId: string): Promise<CategoryAndSum[]> {
+		const categoryAmountSums = (await this.categoryExpensesRepository.query(
+			`SELECT
+					category.name as category,
+					SUM(amount)::int as sum
+			FROM
+					category_expense
+			LEFT JOIN
+					category on category_id = category.id
+			WHERE
+					monthly_expense_id = '${monthlyExpenseId}'
+					AND date = ${date}
+					AND excluding_in_total = false
+			GROUP BY
+					category.name`,
+		)) as CategoryAndSum[];
+		return categoryAmountSums;
 	}
 
 	async updateOne(id: string, partialCategoryExpense: QueryPartialEntity<CategoryExpense>) {
