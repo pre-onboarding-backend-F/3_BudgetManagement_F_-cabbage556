@@ -4,7 +4,7 @@ import { MonthlyExpense } from './entity';
 import { FindOptionsRelations, FindOptionsWhere, Repository } from 'typeorm';
 import { GetExpensesQueryDto } from 'src/expenses';
 import { User } from 'src/users';
-import { YearMonthDay } from 'src/global';
+import { TotalAmountRatio, YearMonthDay } from 'src/global';
 
 @Injectable()
 export class MonthlyExpensesService {
@@ -65,5 +65,40 @@ export class MonthlyExpensesService {
 		}
 
 		return await qb.getMany();
+	}
+
+	async getTotalAmountConsumptionRatio(
+		userId: string,
+		{ year, month }: Omit<YearMonthDay, 'day'>,
+	): Promise<TotalAmountRatio> {
+		const [{ monthly_expense_id: monthlyExpenseId, monthly_budget_id: monthlyBudgetId, ratio }] = await this
+			.monthlyExpensesRepository.query(`
+			SELECT
+					me.id as monthly_expense_id,
+					mb.id as monthly_budget_id,
+					round(me.total_amount::numeric / mb.total_amount::numeric * 100)::int as ratio
+			FROM
+					monthly_expense me,
+					(
+							SELECT
+									mb.id,
+									mb.total_amount
+							FROM
+									monthly_budget mb
+							WHERE
+									mb.year = ${year}
+									AND mb.month = ${month}
+									AND mb.user_id = '${userId}'
+					) as mb
+			WHERE
+					me.year = ${year}
+					AND me.month = ${month}
+					AND me.user_id = '${userId}'
+		`);
+		return {
+			monthlyExpenseId,
+			monthlyBudgetId,
+			ratio,
+		};
 	}
 }
