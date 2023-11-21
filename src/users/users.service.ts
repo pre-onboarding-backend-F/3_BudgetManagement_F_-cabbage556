@@ -31,8 +31,8 @@ export class UsersService {
 		return await this.usersRepository.findOne({ where });
 	}
 
-	async findRandomOneId(userId: string, { year, month }: Omit<YearMonthDay, 'day'>): Promise<Pick<User, 'id'>[]> {
-		const randomOneId = await this.usersRepository.query(
+	async findRandomOneId(userId: string, { year, month }: Omit<YearMonthDay, 'day'>): Promise<string> {
+		const [{ id }] = (await this.usersRepository.query(
 			`SELECT
 					id
 			FROM
@@ -51,8 +51,8 @@ export class UsersService {
 				)
 			ORDER BY RANDOM()
 			LIMIT 1`,
-		);
-		return randomOneId;
+		)) as Pick<User, 'id'>[];
+		return id;
 	}
 
 	async updateOne(where: FindOptionsWhere<User>, user: Partial<User>) {
