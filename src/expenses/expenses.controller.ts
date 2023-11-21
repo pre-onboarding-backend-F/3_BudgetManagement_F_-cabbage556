@@ -7,13 +7,12 @@ import { ExpenseResponse } from './enums';
 import { AccessTokenGuard } from 'src/auth';
 import { InvalidParseUUIDPipe } from './pipes';
 import { GetExpensesQueryDtoPipe } from './pipes/get-expenses-query-dto.pipe';
+import { StatsService } from './stats.service';
 
 @Controller('expenses')
 @UseGuards(AccessTokenGuard)
 export class ExpensesController {
-	constructor(
-		private readonly expensesService: ExpensesService, //
-	) {}
+	constructor(private readonly expensesService: ExpensesService, private readonly statsService: StatsService) {}
 
 	@Post()
 	@ResponseMessage(ExpenseResponse.CREATE_EXPENSE)
@@ -66,6 +65,14 @@ export class ExpensesController {
 		@GetUser() user: User, //
 	) {
 		return await this.expensesService.getTodayExpensesRecommend(user);
+	}
+
+	@Get('stats')
+	@ResponseMessage(ExpenseResponse.GET_EXPENSES_STATS)
+	async getExpensesStats(
+		@GetUser() user: User, //
+	) {
+		return await this.statsService.getExpensesStats(user);
 	}
 
 	@Get(':id')

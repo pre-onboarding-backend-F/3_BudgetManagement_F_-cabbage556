@@ -10,4 +10,5 @@ export enum ExpenseException {
 	BUDGET_NOT_FOUND = '예산이 존재하지 않습니다.',
 	CANNOT_MAKE_TODAY_SUMMARY = '오늘 지출 안내 내용을 생성할 수 없습니다.',
 	CANNOT_MAKE_TODAY_RECOMMEND = '오늘 지출 추천 내용을 생성할 수 없습니다.',
+	CANNOT_MAKE_STATS = '지출 통계를 생성할 수 없습니다.',
 }
