@@ -24,46 +24,38 @@ export class ExpensesService {
 	) {}
 
 	async createExpense(createExpenseDto: CreateExpenseDto, user: User) {
-		const { yyyyMMDD, category, amount, memo, exclude } = createExpenseDto;
-		const { year, month, day } = getDate(yyyyMMDD);
+		const { yyyyMmDd, category: name, amount, memo, exclude: excludingInTotal } = createExpenseDto;
+		const { year, month, day: date } = getDate(yyyyMmDd);
 
-		const oldMonthlyExpense = await this.monthlyExpensesService.findOne({ year, month, user: { id: user.id } });
-
-		// 월별 지출이 존재하는 경우
-		if (oldMonthlyExpense) {
-			// 지출 합계제외 여부가 false인 경우 월별 지출 전체 금액 업데이트
-			let monthlyExpense = oldMonthlyExpense;
-			if (!exclude) {
-				monthlyExpense = await this.updateMonthlyExpenseTotalAmount(monthlyExpense, { amount });
-			}
-
-			// 카테고리별 지출 생성 후 저장
-			const categoryExpense = await this.saveNewCategoryExpense(
-				monthlyExpense,
-				{ day },
-				{ amount, category, memo, exclude },
-			);
-
-			return {
-				monthlyExpense,
-				categoryExpense,
-			};
+		let monthlyExpense = await this.monthlyExpensesService.findOne({ year, month, user: { id: user.id } });
+		if (monthlyExpense) {
+			monthlyExpense.totalAmount += excludingInTotal ? 0 : amount;
+			monthlyExpense = await this.monthlyExpensesService.saveOne(monthlyExpense);
+		} else {
+			const totalAmount = excludingInTotal ? 0 : amount;
+			const createdMonthlyExpense = this.monthlyExpensesService.createOne({ year, month, totalAmount, user });
+			monthlyExpense = await this.monthlyExpensesService.saveOne(createdMonthlyExpense);
 		}
-		// 월별 지출이 존재하지 않는 경우
-		else {
-			// 월별 지출, 카테고리별 지출 생성 후 저장
-			const monthlyExpense = await this.saveNewMonthlyExpense({ year, month }, { amount, exclude }, user);
-			const categoryExpense = await this.saveNewCategoryExpense(
-				monthlyExpense,
-				{ day },
-				{ amount, category, memo, exclude },
-			);
 
-			return {
-				monthlyExpense,
-				categoryExpense,
-			};
-		}
+		// 카테고리별 지출 생성 후 저장
+		const category = await this.categoriesService.findOne({ name });
+		const createdCategoryExpense = this.categoryExpensesService.createOne({
+			category,
+			amount,
+			memo,
+			excludingInTotal,
+			date,
+			monthlyExpense,
+		});
+		const categoryExpense = await this.categoryExpensesService.saveOne(createdCategoryExpense);
+
+		delete monthlyExpense.user;
+		delete categoryExpense.monthlyExpense;
+
+		return {
+			monthlyExpense,
+			categoryExpense,
+		};
 	}
 
 	// 월별 지출 전체 금액 업데이트
@@ -77,50 +69,6 @@ export class ExpensesService {
 		monthlyExpense.totalAmount += amount;
 
 		return await this.monthlyExpensesService.saveOne(monthlyExpense);
-	}
-
-	// 새로운 월별 지출 생성 후 저장
-	async saveNewMonthlyExpense(
-		yearMonthDay: Omit<YearMonthDay, 'day'>,
-		partialDto: Partial<Omit<CreateExpenseDto, 'yyyyMMDD'>>,
-		user: User,
-	) {
-		const { year, month } = yearMonthDay;
-		const { exclude } = partialDto;
-		let { amount: totalAmount } = partialDto;
-
-		// 지출 합계제외 여부가 true인 경우 전체 금액을 0으로 설정하여 월별 지출 생성
-		if (exclude) {
-			totalAmount = 0;
-		}
-
-		// 월별 지출 생성 후 저장
-		const monthlyExpense = this.monthlyExpensesService.createOne({ year, month, totalAmount, user });
-		return await this.monthlyExpensesService.saveOne(monthlyExpense);
-	}
-
-	// 새로운 카테고리별 지출 생성 후 저장
-	async saveNewCategoryExpense(
-		monthlyExpense: MonthlyExpense,
-		yearMonthDay: Pick<YearMonthDay, 'day'>,
-		partialDto: Partial<Omit<CreateExpenseDto, 'yyyyMMDD'>>,
-	): Promise<CategoryExpense> {
-		const { day: date } = yearMonthDay;
-		const { amount, category: name, memo, exclude: excludingInTotal } = partialDto;
-
-		// 카테고리 조회
-		const category = await this.categoriesService.findOne({ name });
-
-		// 카테고리별 지출 생성 후 저장
-		const categoryExpense = this.categoryExpensesService.createOne({
-			date,
-			memo,
-			amount,
-			excludingInTotal,
-			monthlyExpense,
-			category,
-		});
-		return await this.categoryExpensesService.saveOne(categoryExpense);
 	}
 
 	async updateExpense(id: string, updateExpenseDto: UpdateExpenseDto, user: User) {
@@ -143,8 +91,8 @@ export class ExpensesService {
 			throw new UnauthorizedException(ExpenseException.CANNOT_UPDATE_OTHERS);
 		}
 
-		const { yyyyMMDD, category: categoryName, amount, memo, exclude: excludingInTotal } = updateExpenseDto;
-		const { year, month, day: date } = getDate(yyyyMMDD);
+		const { yyyyMmDd, category: categoryName, amount, memo, exclude: excludingInTotal } = updateExpenseDto;
+		const { year, month, day: date } = getDate(yyyyMmDd);
 
 		// 수정할 날짜로 전달한 year, month가 월별 지출의 year, month와 일치하지 않는 경우 업데이트할 수 없으므로 BadRequest 예외를 던짐
 		// year, month가 월별 지출의 year, month와 일치하지 않는 경우라면 지출 기록을 새롭게 생성해야 함
@@ -245,7 +193,7 @@ export class ExpensesService {
 
 	checkValuesMatched(
 		categoryExpense: CategoryExpense,
-		values: Pick<YearMonthDay, 'day'> & Omit<UpdateExpenseDto, 'yyyyMMDD'>,
+		values: Pick<YearMonthDay, 'day'> & Omit<UpdateExpenseDto, 'yyyyMmDd'>,
 	): boolean {
 		const { day: date, category: categoryName, amount, memo, exclude: excludingInTotal } = values;
 		const dateMatched = categoryExpense.date === date;
