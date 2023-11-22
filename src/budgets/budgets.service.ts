@@ -12,6 +12,7 @@ import {
 } from 'src/global';
 import { User } from 'src/users';
 import { CategoriesService } from 'src/categories';
+import { CategoryRecommendAmount } from './interfaces/category-recommend-amounts';
 
 @Injectable()
 export class BudgetsService {
@@ -138,20 +139,26 @@ export class BudgetsService {
 
 		// 카테고리별 예산 금액의 각 퍼센트의 평균을 구해 카테고리별 추천 예산 금액 계산
 		let categoryTotalAmount = 0;
-		const categoryAmounts = {};
+		const categoryRecommendAmounts: CategoryRecommendAmount[] = [];
 		for (const [categoryName, percents] of categoryPercents) {
 			const categoryPercentAvg = Math.round(percents.reduce((prev, curr) => (prev += curr), 0) / percents.length); // 카테고리별 퍼센트의 평균
 			const categoryRecommendAmount = (totalAmount * categoryPercentAvg) / 100; // 카테고리별 추천 예산 금액
-			categoryAmounts[categoryName] = categoryRecommendAmount;
+
+			categoryRecommendAmounts.push({ category: categoryName, recommendAmount: categoryRecommendAmount });
 			categoryTotalAmount += categoryRecommendAmount;
 		}
 
 		// 오차가 발생할 경우 '카페' 카테고리의 추천 예산 금액에 더하기
 		const amountDifference = totalAmount - categoryTotalAmount;
 		if (amountDifference > 0) {
-			categoryAmounts[CategoryName.CAFE] += amountDifference;
+			const cafeIndex = categoryRecommendAmounts.findIndex(
+				(categoryRecommendAmount) => categoryRecommendAmount.category === CategoryName.CAFE,
+			);
+			if (cafeIndex !== -1) {
+				categoryRecommendAmounts[cafeIndex].recommendAmount += amountDifference;
+			}
 		}
 
-		return categoryAmounts;
+		return categoryRecommendAmounts;
 	}
 }
