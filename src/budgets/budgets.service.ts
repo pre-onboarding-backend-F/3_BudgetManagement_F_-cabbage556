@@ -22,8 +22,8 @@ export class BudgetsService {
 	) {}
 
 	async setBudget(setBudgetDto: SetBudgetDto, user: User) {
-		const { yyyyMM, ...categoriesAmount } = setBudgetDto;
-		const { year, month } = getDate(yyyyMM);
+		const { yyyyMm, ...categoriesAmount } = setBudgetDto;
+		const { year, month } = getDate(yyyyMm);
 		const totalAmount = getTotalAmount(categoriesAmount);
 
 		const oldMonthlyBudget = await this.monthlyBudgetsService.findOne({

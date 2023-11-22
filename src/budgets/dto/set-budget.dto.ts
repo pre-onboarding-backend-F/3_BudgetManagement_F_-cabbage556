@@ -2,7 +2,7 @@ import { IsValidAmount, IsValidYYYYMMFormat } from 'src/global';
 
 export class SetBudgetDto {
 	@IsValidYYYYMMFormat()
-	yyyyMM: string;
+	yyyyMm: string;
 
 	@IsValidAmount('food')
 	food: number;
