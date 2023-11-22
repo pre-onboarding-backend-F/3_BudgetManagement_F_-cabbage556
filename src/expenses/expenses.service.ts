@@ -15,6 +15,8 @@ import { ExpenseException, RecommendMessage } from './enums';
 import { MonthlyBudgetsService } from 'src/monthly-budgets';
 import { MonthTotalAmount } from './interfaces/month-total-amount';
 import { CategoryTotalAmount } from './interfaces/category-total-amount';
+import { ExpenseSummary } from './interfaces/expense-summary';
+import { CategoryExpenseSummary } from './interfaces/category-expense-summary';
 
 @Injectable()
 export class ExpensesService {
@@ -371,7 +373,7 @@ export class ExpensesService {
 		);
 		if (!monthlyBudget) {
 			throw new UnprocessableEntityException(
-				`${ExpenseException.BUDGET_NOT_FOUND} ${ExpenseException.CANNOT_MAKE_TODAY_SUMMARY}`,
+				`이번 달 ${ExpenseException.BUDGET_NOT_FOUND} ${ExpenseException.CANNOT_MAKE_TODAY_SUMMARY}`,
 			);
 		}
 
@@ -382,7 +384,7 @@ export class ExpensesService {
 		);
 		if (!monthlyExpense) {
 			throw new UnprocessableEntityException(
-				`${ExpenseException.NOT_FOUND} ${ExpenseException.CANNOT_MAKE_TODAY_SUMMARY}`,
+				`이번 달 ${ExpenseException.NOT_FOUND} ${ExpenseException.CANNOT_MAKE_TODAY_SUMMARY}`,
 			);
 		}
 
@@ -397,10 +399,10 @@ export class ExpensesService {
 		);
 
 		// 오늘 전체 지출 요약
-		const todayTotalSummary = {
-			sum: todaySum,
-			proper: todayProperAmount,
-			risk: todayRisk,
+		const todayTotalSummary: ExpenseSummary = {
+			totalAmount: todaySum,
+			properAmount: todayProperAmount,
+			amountRisk: todayRisk,
 		};
 
 		// 카테고리별 지출 금액 합계 계산
@@ -418,7 +420,7 @@ export class ExpensesService {
 		});
 
 		// 카테고리별 지출 요약
-		const todayCategorySummary = {};
+		const todayCategorySummary: CategoryExpenseSummary[] = [];
 
 		// 카테고리별 적정 지출 금액, 위험도 계산
 		todayCategorySums.forEach((todayCategorySum, categoryName) => {
@@ -432,17 +434,17 @@ export class ExpensesService {
 				todayCategorySum,
 			);
 
-			// 카테고리 이름을 키로, 요약 객체를 값으로 할당
-			todayCategorySummary[categoryName] = {
-				sum: todayCategorySum,
-				proper: categoryProperAmount,
-				risk: categoryRisk,
-			};
+			todayCategorySummary.push({
+				category: categoryName,
+				totalAmount: todayCategorySum,
+				properAmount: categoryProperAmount,
+				amountRisk: categoryRisk,
+			});
 		});
 
 		return {
-			total_summary: todayTotalSummary,
-			category_summary: todayCategorySummary,
+			todayTotalSummary,
+			todayCategorySummary,
 		};
 	}
 
