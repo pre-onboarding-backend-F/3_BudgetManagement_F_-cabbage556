@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { CategoryBudgetsService } from 'src/category-budgets';
+import { CategoryBudget, CategoryBudgetsService } from 'src/category-budgets';
 import { MonthlyBudget, MonthlyBudgetsService } from 'src/monthly-budgets';
 import { GetBudgetRecommendQueryDto, SetBudgetDto } from './dto';
 import {
@@ -12,7 +12,8 @@ import {
 } from 'src/global';
 import { User } from 'src/users';
 import { CategoriesService } from 'src/categories';
-import { CategoryRecommendAmount } from './interfaces/category-recommend-amounts';
+import { CategoryRecommendAmount } from './interfaces/category-recommend-amount';
+import { CategoryBudgetAmount } from './interfaces/category-budget-amount';
 
 @Injectable()
 export class BudgetsService {
@@ -54,23 +55,31 @@ export class BudgetsService {
 			monthlyBudget.totalAmount = totalAmount;
 			await this.monthlyBudgetsService.saveOne(monthlyBudget);
 		}
-		const oldCategoryBudgets = await this.categoryBudgetsService.findMany({
-			monthlyBudget: {
-				id: monthlyBudget.id,
-			},
-		});
+
+		// 월별 예산에 해당하는 카테고리별 예산 조회
+		const oldCategoryBudgets = await this.categoryBudgetsService.findMany(
+			{ monthlyBudget: { id: monthlyBudget.id } }, //
+			{ category: true },
+		);
+
 		oldCategoryBudgets.forEach((categoryBudget) => {
-			const categoryName = getLowercaseCategoryNameEnumKey(categoryBudget.category.name);
-			if (categoriesAmount[categoryName] !== categoryBudget.amount) {
-				categoryBudget.amount = categoriesAmount[categoryName];
-				return;
-			}
+			const categoryName = categoryBudget.category.name;
+			const nameEnumKey = getLowercaseCategoryNameEnumKey(categoryName);
+			categoryBudget.amount = categoriesAmount[nameEnumKey];
 		});
 		const categoryBudgets = await this.categoryBudgetsService.saveMany(oldCategoryBudgets);
 
+		// 응답 배열 생성
+		const categoryBudgetAmounts: CategoryBudgetAmount[] = [];
+		categoryBudgets.forEach((categoryBudget) => {
+			categoryBudgetAmounts.push({ category: categoryBudget.category.name, budgetAmount: categoryBudget.amount });
+		});
+
+		delete monthlyBudget.id;
+
 		return {
 			monthlyBudget,
-			categoryBudgets,
+			categoryBudgets: categoryBudgetAmounts,
 		};
 	}
 
@@ -84,23 +93,29 @@ export class BudgetsService {
 		const createdMonthlyBudget = this.monthlyBudgetsService.createOne({ year, month, totalAmount, user });
 		const monthlyBudget = await this.monthlyBudgetsService.saveOne(createdMonthlyBudget);
 		const categories = await this.categoriesService.findAll();
-		const createdCategoryBudgets = [];
+
+		const createdCategoryBudgets: CategoryBudget[] = [];
 		categories.forEach((category) => {
 			const categoryName = getLowercaseCategoryNameEnumKey(category.name);
+			const amount = categoriesAmount[categoryName];
+
 			// 카테고리별 예산 생성
-			createdCategoryBudgets.push(
-				this.categoryBudgetsService.createOne({
-					amount: categoriesAmount[categoryName],
-					category,
-					monthlyBudget,
-				}),
-			);
+			createdCategoryBudgets.push(this.categoryBudgetsService.createOne({ amount, category, monthlyBudget }));
 		});
 		const categoryBudgets = await this.categoryBudgetsService.saveMany(createdCategoryBudgets);
 
+		// 응답 배열 생성
+		const categoryBudgetAmounts: CategoryBudgetAmount[] = [];
+		categoryBudgets.forEach((categoryBudget) => {
+			categoryBudgetAmounts.push({ category: categoryBudget.category.name, budgetAmount: categoryBudget.amount });
+		});
+
+		delete monthlyBudget.id;
+		delete monthlyBudget.user;
+
 		return {
 			monthlyBudget,
-			categoryBudgets,
+			categoryBudgets: categoryBudgetAmounts,
 		};
 	}
 
