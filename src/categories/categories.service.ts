@@ -22,7 +22,7 @@ export class CategoriesService implements OnModuleInit {
 	}
 
 	async findAll(): Promise<Category[]> {
-		return await this.categoriesRepository.find();
+		return await this.categoriesRepository.find({ select: { name: true } });
 	}
 
 	async findOne(where: FindOptionsWhere<Category>): Promise<Category> {
