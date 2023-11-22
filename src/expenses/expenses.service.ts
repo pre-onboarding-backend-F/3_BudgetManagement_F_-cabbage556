@@ -240,6 +240,8 @@ export class ExpensesService {
 			throw new UnauthorizedException(ExpenseException.CANNOT_GET_OTHERS);
 		}
 
+		delete categoryExpense.monthlyExpense.user;
+
 		return categoryExpense;
 	}
 
