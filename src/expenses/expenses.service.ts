@@ -113,7 +113,6 @@ export class ExpensesService {
 			return;
 		}
 
-		// 카테고리별 지출 업데이트
 		// 이전 카테고리와 다른 경우 카테고리 업데이트
 		let category = categoryExpense.category;
 		if (categoryExpense.category.name !== categoryName) {
@@ -127,11 +126,13 @@ export class ExpensesService {
 			category,
 		});
 
+		delete categoryExpense.monthlyExpense.user;
+
 		// dto의 지출 합계제외 여부: true / 기존의 지출 합계제외 여부: true
 		// 월별 지출 전체 금액을 업데이트하지 않음
 		if (excludingInTotal && categoryExpense.excludingInTotal) {
 			return {
-				monthlyExpense: await this.monthlyExpensesService.findOne({ id: categoryExpense.monthlyExpense.id }),
+				monthlyExpense: categoryExpense.monthlyExpense,
 				categoryExpense: await this.categoryExpensesService.findOne(
 					{ id: categoryExpense.id },
 					{ category: true },
