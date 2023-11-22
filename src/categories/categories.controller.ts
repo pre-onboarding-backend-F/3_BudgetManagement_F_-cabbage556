@@ -15,6 +15,6 @@ export class CategoriesController {
 	@Get()
 	@ResponseMessage(CategoryResponse.GET_ALL_CATEGORY_NAMES)
 	async getAllCategoryNames(): Promise<Category[]> {
-		return await this.categoriesService.findAll();
+		return await this.categoriesService.findAll({ select: { name: true } });
 	}
 }

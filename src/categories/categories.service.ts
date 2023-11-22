@@ -1,7 +1,7 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Category } from './entity';
-import { FindOptionsWhere, Repository } from 'typeorm';
+import { FindManyOptions, FindOptionsWhere, Repository } from 'typeorm';
 import { CategoryName } from 'src/global';
 
 @Injectable()
@@ -21,8 +21,8 @@ export class CategoriesService implements OnModuleInit {
 		});
 	}
 
-	async findAll(): Promise<Category[]> {
-		return await this.categoriesRepository.find({ select: { name: true } });
+	async findAll(options?: FindManyOptions<Category>): Promise<Category[]> {
+		return await this.categoriesRepository.find(options);
 	}
 
 	async findOne(where: FindOptionsWhere<Category>): Promise<Category> {
