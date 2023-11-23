@@ -13,6 +13,11 @@ import { YearMonthDay, getDate, getToday } from 'src/global';
 import { CategoriesService } from 'src/categories';
 import { ExpenseException, RecommendMessage } from './enums';
 import { MonthlyBudgetsService } from 'src/monthly-budgets';
+import { MonthTotalAmount } from './interfaces/month-total-amount';
+import { CategoryTotalAmount } from './interfaces/category-total-amount';
+import { ExpenseSummary } from './interfaces/expense-summary';
+import { CategoryExpenseSummary } from './interfaces/category-expense-summary';
+import { CategoryProperAmount } from './interfaces/category-proper-amount';
 
 @Injectable()
 export class ExpensesService {
@@ -24,46 +29,38 @@ export class ExpensesService {
 	) {}
 
 	async createExpense(createExpenseDto: CreateExpenseDto, user: User) {
-		const { yyyyMMDD, category, amount, memo, exclude } = createExpenseDto;
-		const { year, month, day } = getDate(yyyyMMDD);
+		const { yyyyMmDd, category: name, amount, memo, exclude: excludingInTotal } = createExpenseDto;
+		const { year, month, day: date } = getDate(yyyyMmDd);
 
-		const oldMonthlyExpense = await this.monthlyExpensesService.findOne({ year, month, user: { id: user.id } });
-
-		// 월별 지출이 존재하는 경우
-		if (oldMonthlyExpense) {
-			// 지출 합계제외 여부가 false인 경우 월별 지출 전체 금액 업데이트
-			let monthlyExpense = oldMonthlyExpense;
-			if (!exclude) {
-				monthlyExpense = await this.updateMonthlyExpenseTotalAmount(monthlyExpense, { amount });
-			}
-
-			// 카테고리별 지출 생성 후 저장
-			const categoryExpense = await this.saveNewCategoryExpense(
-				monthlyExpense,
-				{ day },
-				{ amount, category, memo, exclude },
-			);
-
-			return {
-				monthlyExpense,
-				categoryExpense,
-			};
+		let monthlyExpense = await this.monthlyExpensesService.findOne({ year, month, user: { id: user.id } });
+		if (monthlyExpense) {
+			monthlyExpense.totalAmount += excludingInTotal ? 0 : amount;
+			monthlyExpense = await this.monthlyExpensesService.saveOne(monthlyExpense);
+		} else {
+			const totalAmount = excludingInTotal ? 0 : amount;
+			const createdMonthlyExpense = this.monthlyExpensesService.createOne({ year, month, totalAmount, user });
+			monthlyExpense = await this.monthlyExpensesService.saveOne(createdMonthlyExpense);
 		}
-		// 월별 지출이 존재하지 않는 경우
-		else {
-			// 월별 지출, 카테고리별 지출 생성 후 저장
-			const monthlyExpense = await this.saveNewMonthlyExpense({ year, month }, { amount, exclude }, user);
-			const categoryExpense = await this.saveNewCategoryExpense(
-				monthlyExpense,
-				{ day },
-				{ amount, category, memo, exclude },
-			);
 
-			return {
-				monthlyExpense,
-				categoryExpense,
-			};
-		}
+		// 카테고리별 지출 생성 후 저장
+		const category = await this.categoriesService.findOne({ name });
+		const createdCategoryExpense = this.categoryExpensesService.createOne({
+			category,
+			amount,
+			memo,
+			excludingInTotal,
+			date,
+			monthlyExpense,
+		});
+		const categoryExpense = await this.categoryExpensesService.saveOne(createdCategoryExpense);
+
+		delete monthlyExpense.user;
+		delete categoryExpense.monthlyExpense;
+
+		return {
+			monthlyExpense,
+			categoryExpense,
+		};
 	}
 
 	// 월별 지출 전체 금액 업데이트
@@ -77,50 +74,6 @@ export class ExpensesService {
 		monthlyExpense.totalAmount += amount;
 
 		return await this.monthlyExpensesService.saveOne(monthlyExpense);
-	}
-
-	// 새로운 월별 지출 생성 후 저장
-	async saveNewMonthlyExpense(
-		yearMonthDay: Omit<YearMonthDay, 'day'>,
-		partialDto: Partial<Omit<CreateExpenseDto, 'yyyyMMDD'>>,
-		user: User,
-	) {
-		const { year, month } = yearMonthDay;
-		const { exclude } = partialDto;
-		let { amount: totalAmount } = partialDto;
-
-		// 지출 합계제외 여부가 true인 경우 전체 금액을 0으로 설정하여 월별 지출 생성
-		if (exclude) {
-			totalAmount = 0;
-		}
-
-		// 월별 지출 생성 후 저장
-		const monthlyExpense = this.monthlyExpensesService.createOne({ year, month, totalAmount, user });
-		return await this.monthlyExpensesService.saveOne(monthlyExpense);
-	}
-
-	// 새로운 카테고리별 지출 생성 후 저장
-	async saveNewCategoryExpense(
-		monthlyExpense: MonthlyExpense,
-		yearMonthDay: Pick<YearMonthDay, 'day'>,
-		partialDto: Partial<Omit<CreateExpenseDto, 'yyyyMMDD'>>,
-	): Promise<CategoryExpense> {
-		const { day: date } = yearMonthDay;
-		const { amount, category: name, memo, exclude: excludingInTotal } = partialDto;
-
-		// 카테고리 조회
-		const category = await this.categoriesService.findOne({ name });
-
-		// 카테고리별 지출 생성 후 저장
-		const categoryExpense = this.categoryExpensesService.createOne({
-			date,
-			memo,
-			amount,
-			excludingInTotal,
-			monthlyExpense,
-			category,
-		});
-		return await this.categoryExpensesService.saveOne(categoryExpense);
 	}
 
 	async updateExpense(id: string, updateExpenseDto: UpdateExpenseDto, user: User) {
@@ -143,8 +96,8 @@ export class ExpensesService {
 			throw new UnauthorizedException(ExpenseException.CANNOT_UPDATE_OTHERS);
 		}
 
-		const { yyyyMMDD, category: categoryName, amount, memo, exclude: excludingInTotal } = updateExpenseDto;
-		const { year, month, day: date } = getDate(yyyyMMDD);
+		const { yyyyMmDd, category: categoryName, amount, memo, exclude: excludingInTotal } = updateExpenseDto;
+		const { year, month, day: date } = getDate(yyyyMmDd);
 
 		// 수정할 날짜로 전달한 year, month가 월별 지출의 year, month와 일치하지 않는 경우 업데이트할 수 없으므로 BadRequest 예외를 던짐
 		// year, month가 월별 지출의 year, month와 일치하지 않는 경우라면 지출 기록을 새롭게 생성해야 함
@@ -165,7 +118,6 @@ export class ExpensesService {
 			return;
 		}
 
-		// 카테고리별 지출 업데이트
 		// 이전 카테고리와 다른 경우 카테고리 업데이트
 		let category = categoryExpense.category;
 		if (categoryExpense.category.name !== categoryName) {
@@ -179,11 +131,13 @@ export class ExpensesService {
 			category,
 		});
 
+		delete categoryExpense.monthlyExpense.user;
+
 		// dto의 지출 합계제외 여부: true / 기존의 지출 합계제외 여부: true
 		// 월별 지출 전체 금액을 업데이트하지 않음
 		if (excludingInTotal && categoryExpense.excludingInTotal) {
 			return {
-				monthlyExpense: await this.monthlyExpensesService.findOne({ id: categoryExpense.monthlyExpense.id }),
+				monthlyExpense: categoryExpense.monthlyExpense,
 				categoryExpense: await this.categoryExpensesService.findOne(
 					{ id: categoryExpense.id },
 					{ category: true },
@@ -245,7 +199,7 @@ export class ExpensesService {
 
 	checkValuesMatched(
 		categoryExpense: CategoryExpense,
-		values: Pick<YearMonthDay, 'day'> & Omit<UpdateExpenseDto, 'yyyyMMDD'>,
+		values: Pick<YearMonthDay, 'day'> & Omit<UpdateExpenseDto, 'yyyyMmDd'>,
 	): boolean {
 		const { day: date, category: categoryName, amount, memo, exclude: excludingInTotal } = values;
 		const dateMatched = categoryExpense.date === date;
@@ -292,6 +246,8 @@ export class ExpensesService {
 			throw new UnauthorizedException(ExpenseException.CANNOT_GET_OTHERS);
 		}
 
+		delete categoryExpense.monthlyExpense.user;
+
 		return categoryExpense;
 	}
 
@@ -310,61 +266,36 @@ export class ExpensesService {
 
 		// 시작 일과 종료 일 범위 바깥에 있는 카테고리별 지출 필터링
 		monthlyExpenses.forEach(
-			this.filterOutsideDateRange2({ month: startMonth, day: startDay }, { month: endMonth, day: endDay }),
+			this.filterOutsideDateRange({ month: startMonth, day: startDay }, { month: endMonth, day: endDay }),
 		);
 
 		// 월별 지출 합계 계산
-		const monthlySums = new Map<string, number>(); // 조회 기간 동안의 월별 지출 합계 { '2023-11': 11월 지출 금액, '2023-12': 12월 지출 금액, ... }
-		monthlyExpenses.forEach(this.caculateMonthlySums2(monthlySums));
+		const monthlySum = new Map<string, number>(); // 조회 기간 동안의 월별 지출 합계 { '2023-11': 11월 지출 금액, '2023-12': 12월 지출 금액, ... }
+		monthlyExpenses.forEach(this.caculateMonthlySums(monthlySum));
+
+		// 월별 지출 합계 응답 생성
+		const monthlySums: MonthTotalAmount[] = [];
+		monthlySum.forEach((totalAmount, month) => monthlySums.push({ month, totalAmount }));
 
 		// 각 카테고리별 지출의 합계 계산
-		const categorySums = new Map<string, number>(); // 조회 기간 동안의 각 카테고리별 지출 합계 { '음식': 200000, '교통': 200000, ... }
-		monthlyExpenses.forEach(this.calculateCategorySums2(categorySums));
+		const categorySum = new Map<string, number>(); // 조회 기간 동안의 각 카테고리별 지출 합계 { '음식': 200000, '교통': 200000, ... }
+		monthlyExpenses.forEach(this.calculateCategorySums(categorySum));
+
+		// 카테고리별 지출 합계 응답 생성
+		const categorySums: CategoryTotalAmount[] = [];
+		categorySum.forEach((totalAmount, category) => categorySums.push({ category, totalAmount }));
 
 		// 지출 기록, 월별 지출 합계, 각 카테고리별 지출 합계 리턴
 		return {
 			expenses: monthlyExpenses,
 			sums: {
 				months: monthlySums,
-				category: categorySums,
+				categories: categorySums,
 			},
 		};
 	}
 
-	filterOutsideDateRange(
-		monthlyExpenses: MonthlyExpense[],
-		startDate: Omit<YearMonthDay, 'year'>,
-		endDate: Omit<YearMonthDay, 'year'>,
-	) {
-		const { month: startMonth, day: startDay } = startDate;
-		const { month: endMonth, day: endDay } = endDate;
-
-		// 시작 날짜와 종료 날짜 사이에 존재하는 카테고리별 지출만 월별 지출에 할당
-		monthlyExpenses.forEach((monthlyExpense) => {
-			const equalToStartMonth = monthlyExpense.month === startMonth;
-			const equalToEndMonth = monthlyExpense.month === endMonth;
-
-			const categoryExpensesBetweenDates = monthlyExpense.categoryExpenses.filter((categoryExpense) => {
-				// 시작 월의 경우 startDay보다 작은 날짜는 필터링
-				const beforeStartDay = categoryExpense.date < startDay;
-				if (equalToStartMonth && beforeStartDay) {
-					return false;
-				}
-
-				// 종료 월의 경우 endDay보다 큰 날짜는 필터링
-				const afterEndDay = categoryExpense.date > endDay;
-				if (equalToEndMonth && afterEndDay) {
-					return false;
-				}
-
-				return true;
-			});
-
-			monthlyExpense.categoryExpenses = categoryExpensesBetweenDates;
-		});
-	}
-
-	filterOutsideDateRange2(startDate: Omit<YearMonthDay, 'year'>, endDate: Omit<YearMonthDay, 'year'>) {
+	filterOutsideDateRange(startDate: Omit<YearMonthDay, 'year'>, endDate: Omit<YearMonthDay, 'year'>) {
 		const { month: startMonth, day: startDay } = startDate;
 		const { month: endMonth, day: endDay } = endDate;
 
@@ -392,29 +323,7 @@ export class ExpensesService {
 		};
 	}
 
-	calculateMonthlySums(monthlyExpenses: MonthlyExpense[], monthlySums: Map<string, number>) {
-		monthlyExpenses.forEach((monthlyExpense) => {
-			// 응답에서 월별 지출 전체 금액 제거
-			delete monthlyExpense.totalAmount;
-
-			// 월별 지출 합계 키: 'yyyy-mm'
-			const yearMonth = `${monthlyExpense.year}-${monthlyExpense.month}`;
-
-			// 월별 지출 합계 계산
-			monthlyExpense.categoryExpenses.forEach((categoryExpense) => {
-				let monthlySum = monthlySums.get(yearMonth) ?? 0;
-
-				// 지출 합계제외 여부가 true이면 합계 계산 시 제외
-				if (!categoryExpense.excludingInTotal) {
-					monthlySum += categoryExpense.amount;
-				}
-
-				monthlySums.set(yearMonth, monthlySum);
-			});
-		});
-	}
-
-	caculateMonthlySums2(monthlySums: Map<string, number>) {
+	caculateMonthlySums(monthlySums: Map<string, number>) {
 		return (monthlyExpense: MonthlyExpense) => {
 			// 응답에서 월별 지출 전체 금액 제거
 			delete monthlyExpense.totalAmount;
@@ -436,27 +345,7 @@ export class ExpensesService {
 		};
 	}
 
-	calculateCategorySums(monthlyExpenses: MonthlyExpense[], categorySums: Map<string, number>) {
-		// 카테고리별 지출 합계 계산
-		monthlyExpenses.forEach((monthlyExpense) => {
-			monthlyExpense.categoryExpenses.forEach((categoryExpense) => {
-				// 카테고리별 지출 합계 키: 카테고리 이름
-				const categoryName = categoryExpense.category.name;
-				let categorySum = categorySums.get(categoryName) ?? 0;
-
-				// 지출 합계제외 여부가 true이면 합계 계산 시 제외
-				if (!categoryExpense.excludingInTotal) {
-					categorySum += categoryExpense.amount;
-				}
-
-				if (categorySum !== 0) {
-					categorySums.set(categoryName, categorySum);
-				}
-			});
-		});
-	}
-
-	calculateCategorySums2(categorySums: Map<string, number>) {
+	calculateCategorySums(categorySums: Map<string, number>) {
 		return (monthlyExpense: MonthlyExpense) => {
 			monthlyExpense.categoryExpenses.forEach((categoryExpense) => {
 				// 카테고리별 지출 합계 키: 카테고리 이름
@@ -485,7 +374,7 @@ export class ExpensesService {
 		);
 		if (!monthlyBudget) {
 			throw new UnprocessableEntityException(
-				`${ExpenseException.BUDGET_NOT_FOUND} ${ExpenseException.CANNOT_MAKE_TODAY_SUMMARY}`,
+				`이번 달 ${ExpenseException.BUDGET_NOT_FOUND} ${ExpenseException.CANNOT_MAKE_TODAY_SUMMARY}`,
 			);
 		}
 
@@ -496,7 +385,7 @@ export class ExpensesService {
 		);
 		if (!monthlyExpense) {
 			throw new UnprocessableEntityException(
-				`${ExpenseException.NOT_FOUND} ${ExpenseException.CANNOT_MAKE_TODAY_SUMMARY}`,
+				`이번 달 ${ExpenseException.NOT_FOUND} ${ExpenseException.CANNOT_MAKE_TODAY_SUMMARY}`,
 			);
 		}
 
@@ -511,10 +400,10 @@ export class ExpensesService {
 		);
 
 		// 오늘 전체 지출 요약
-		const todayTotalSummary = {
-			sum: todaySum,
-			proper: todayProperAmount,
-			risk: todayRisk,
+		const todayTotalSummary: ExpenseSummary = {
+			totalAmount: todaySum,
+			properAmount: todayProperAmount,
+			amountRisk: todayRisk,
 		};
 
 		// 카테고리별 지출 금액 합계 계산
@@ -532,7 +421,7 @@ export class ExpensesService {
 		});
 
 		// 카테고리별 지출 요약
-		const todayCategorySummary = {};
+		const todayCategorySummary: CategoryExpenseSummary[] = [];
 
 		// 카테고리별 적정 지출 금액, 위험도 계산
 		todayCategorySums.forEach((todayCategorySum, categoryName) => {
@@ -546,17 +435,17 @@ export class ExpensesService {
 				todayCategorySum,
 			);
 
-			// 카테고리 이름을 키로, 요약 객체를 값으로 할당
-			todayCategorySummary[categoryName] = {
-				sum: todayCategorySum,
-				proper: categoryProperAmount,
-				risk: categoryRisk,
-			};
+			todayCategorySummary.push({
+				category: categoryName,
+				totalAmount: todayCategorySum,
+				properAmount: categoryProperAmount,
+				amountRisk: categoryRisk,
+			});
 		});
 
 		return {
-			total_summary: todayTotalSummary,
-			category_summary: todayCategorySummary,
+			todayTotalSummary,
+			todayCategorySummary,
 		};
 	}
 
@@ -578,7 +467,7 @@ export class ExpensesService {
 		);
 		if (!monthlyBudget) {
 			throw new UnprocessableEntityException(
-				`${ExpenseException.BUDGET_NOT_FOUND} ${ExpenseException.CANNOT_MAKE_TODAY_RECOMMEND}`,
+				`이번 달 ${ExpenseException.BUDGET_NOT_FOUND} ${ExpenseException.CANNOT_MAKE_TODAY_RECOMMEND}`,
 			);
 		}
 
@@ -586,9 +475,6 @@ export class ExpensesService {
 			{ year, month, user: { id: user.id } },
 			{ categoryExpenses: { category: true } },
 		);
-
-		// 오늘 카테고리별 지출 추천
-		const todayCategoryRecommend = {};
 
 		// 월별 예산 전체 금액에서 남은 금액이 없는지 확인
 		const budgetLeft = monthlyBudget.totalAmount > (monthlyExpense?.totalAmount ?? -Infinity);
@@ -612,6 +498,8 @@ export class ExpensesService {
 				currentDate,
 			);
 
+			// 오늘 카테고리별 지출 추천
+			const todayCategoryProperAmounts: CategoryProperAmount[] = [];
 			monthlyBudget.categoryBudgets.forEach((categoryBudget) => {
 				const categoryName = categoryBudget.category.name;
 				const categoryBudgetAmount = categoryBudget.amount;
@@ -625,14 +513,14 @@ export class ExpensesService {
 					currentDate,
 				);
 
-				// { "음식": 6600, "교통": 3300, ... }
-				todayCategoryRecommend[categoryName] = categoryProperAmount;
+				// [ { category: '음식', properAmount: 10000 }, { category: '카페', properAmount: 3000}, ... ]
+				todayCategoryProperAmounts.push({ category: categoryName, properAmount: categoryProperAmount });
 			});
 
 			return {
-				recommend_message: recommendMessage,
-				total_recommend: todayProperAmount,
-				category_recommend: todayCategoryRecommend,
+				recommendMessage,
+				todayProperAmount,
+				todayCategoryProperAmounts,
 			};
 		}
 
@@ -640,7 +528,6 @@ export class ExpensesService {
 		// 오늘 전체 지출 추천 계산
 		// 		월별 지출이 존재하는 경우: 월별 남은 금액 / 월에서 남은 일수
 		const remainingTotalAmount = monthlyBudget.totalAmount - monthlyExpense.totalAmount;
-		console.log(30 - day, remainingTotalAmount);
 		const { properAmount: todayProperAmount } = this.getProperAmountAndRisk(remainingTotalAmount, 0, day);
 
 		// 카테고리별 지출 금액 합계 계산
@@ -659,6 +546,7 @@ export class ExpensesService {
 		});
 
 		// 오늘 카테고리별 지출 추천 계산
+		const todayCategoryProperAmounts: CategoryProperAmount[] = [];
 		monthlyBudget.categoryBudgets.forEach((categoryBudget) => {
 			const categoryName = categoryBudget.category.name;
 
@@ -671,7 +559,7 @@ export class ExpensesService {
 			remainingCategoryAmount = remainingCategoryAmount > 0 ? remainingCategoryAmount : 0;
 			const { properAmount: categoryProperAmount } = this.getProperAmountAndRisk(remainingCategoryAmount, 0, day);
 
-			todayCategoryRecommend[categoryName] = categoryProperAmount;
+			todayCategoryProperAmounts.push({ category: categoryName, properAmount: categoryProperAmount });
 		});
 
 		// 추천 메세지 기준에 따라 추천 메세지 생성
@@ -683,9 +571,9 @@ export class ExpensesService {
 			properAmountUpToNow > monthlyExpense.totalAmount ? RecommendMessage.GOOD : RecommendMessage.BAD;
 
 		return {
-			recommend_message: recommendMessage,
-			total_recommend: todayProperAmount,
-			category_recommend: todayCategoryRecommend,
+			recommendMessage,
+			todayProperAmount,
+			todayCategoryProperAmounts,
 		};
 	}
 }

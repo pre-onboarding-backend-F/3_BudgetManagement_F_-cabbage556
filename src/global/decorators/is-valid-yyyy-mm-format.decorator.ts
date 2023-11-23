@@ -1,5 +1,4 @@
 import { applyDecorators } from '@nestjs/common';
-import { Expose } from 'class-transformer';
 import { IsNotEmpty, ValidationOptions, registerDecorator } from 'class-validator';
 
 export function IsOnlyYYYYMM(validationOptions?: ValidationOptions) {
@@ -10,7 +9,7 @@ export function IsOnlyYYYYMM(validationOptions?: ValidationOptions) {
 			propertyName: propertyName,
 			constraints: [],
 			options: {
-				message: 'yyyy_mm 필드에 2020-12 형식의 년도와 월을 입력해야 합니다.',
+				message: '$property 필드에 2020-12 형식의 년도와 월을 입력해야 합니다.',
 				...validationOptions,
 			},
 			validator: {
@@ -26,8 +25,7 @@ export function IsOnlyYYYYMM(validationOptions?: ValidationOptions) {
 
 export function IsValidYYYYMMFormat() {
 	return applyDecorators(
-		Expose({ name: 'yyyy_mm' }),
-		IsNotEmpty({ message: 'yyyy_mm 필드는 필수 입력 필드입니다.' }),
+		IsNotEmpty({ message: '$property 필드는 필수 입력 필드입니다.' }), //
 		IsOnlyYYYYMM(),
 	);
 }
