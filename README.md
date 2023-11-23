@@ -36,9 +36,11 @@
 
 ## API 명세
 
-API 명세를 정리한 링크입니다.
+![image](https://github.com/pre-onboarding-backend-F/3_BudgetManagement_F_cabbage556/assets/56855262/900784cd-6c48-456f-8f55-8a4447284d00)
 
--   <a href="https://burly-replace-13e.notion.site/API-3fb72c5e1f984afd9b8d96a55014b385?pvs=4" target="_blank">🔗 API 명세</a>
+API 명세를 정리한 포스트맨 도큐멘터 링크입니다.
+
+-   <a href="https://documenter.getpostman.com/view/25282518/2s9YeBfZQF#4d73fe29-4ec0-409d-b198-456cc3becc2d" target="_blank">🔗 API 명세</a>
 
 ## TIL
 
@@ -63,4 +65,6 @@ API 명세를 정리한 링크입니다.
 
 ## 프로젝트 회고
 
--   TODO: 업데이트 필요
+프로젝트 회고를 작성한 블로그 링크입니다.
+
+-   <a href="https://velog.io/@cabbage/%EC%98%88%EC%82%B0-%EA%B4%80%EB%A6%AC-%EC%95%A0%ED%94%8C%EB%A6%AC%EC%BC%80%EC%9D%B4%EC%85%98-%ED%94%84%EB%A1%9C%EC%A0%9D%ED%8A%B8-%ED%9A%8C%EA%B3%A0" target="_blank">🔗 예산 관리 애플리케이션 프로젝트 회고</a>
