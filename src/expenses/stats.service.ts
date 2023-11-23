@@ -146,17 +146,17 @@ export class StatsService {
 		});
 
 		return {
-			last_month: {
-				total_consumption_ratio: totalConsumptionRatioCompareToLastMonth,
-				category_consumption_ratio: categoryConsumptionRatioCompareToLastMonth,
+			lastMonth: {
+				totalConsumptionRatio: totalConsumptionRatioCompareToLastMonth,
+				categoryConsumptionRatio: categoryConsumptionRatioCompareToLastMonth,
 			},
-			last_week: {
-				total_consumption_ratio: totalConsumptionRatioCompareToLastWeek,
-				category_consumption_ratio: categoryConsumptionRatioCompareToLastWeek,
+			lastWeek: {
+				totalConsumptionRatio: totalConsumptionRatioCompareToLastWeek,
+				categoryConsumptionRatio: categoryConsumptionRatioCompareToLastWeek,
 			},
-			other_user: {
-				total_consumption_ratio: totalConsumptionRatioCompareToRandomUser,
-				category_consumption_ratio: categoryConsumptionRatioCompareToRandomUser,
+			otherUser: {
+				totalConsumptionRatio: totalConsumptionRatioCompareToRandomUser,
+				categoryConsumptionRatio: categoryConsumptionRatioCompareToRandomUser,
 			},
 		};
 	}
