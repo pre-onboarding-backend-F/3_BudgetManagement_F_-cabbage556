@@ -17,6 +17,7 @@ import { MonthTotalAmount } from './interfaces/month-total-amount';
 import { CategoryTotalAmount } from './interfaces/category-total-amount';
 import { ExpenseSummary } from './interfaces/expense-summary';
 import { CategoryExpenseSummary } from './interfaces/category-expense-summary';
+import { CategoryProperAmount } from './interfaces/category-proper-amount';
 
 @Injectable()
 export class ExpensesService {
@@ -466,7 +467,7 @@ export class ExpensesService {
 		);
 		if (!monthlyBudget) {
 			throw new UnprocessableEntityException(
-				`${ExpenseException.BUDGET_NOT_FOUND} ${ExpenseException.CANNOT_MAKE_TODAY_RECOMMEND}`,
+				`이번 달 ${ExpenseException.BUDGET_NOT_FOUND} ${ExpenseException.CANNOT_MAKE_TODAY_RECOMMEND}`,
 			);
 		}
 
@@ -474,9 +475,6 @@ export class ExpensesService {
 			{ year, month, user: { id: user.id } },
 			{ categoryExpenses: { category: true } },
 		);
-
-		// 오늘 카테고리별 지출 추천
-		const todayCategoryRecommend = {};
 
 		// 월별 예산 전체 금액에서 남은 금액이 없는지 확인
 		const budgetLeft = monthlyBudget.totalAmount > (monthlyExpense?.totalAmount ?? -Infinity);
@@ -500,6 +498,8 @@ export class ExpensesService {
 				currentDate,
 			);
 
+			// 오늘 카테고리별 지출 추천
+			const todayCategoryProperAmounts: CategoryProperAmount[] = [];
 			monthlyBudget.categoryBudgets.forEach((categoryBudget) => {
 				const categoryName = categoryBudget.category.name;
 				const categoryBudgetAmount = categoryBudget.amount;
@@ -513,14 +513,14 @@ export class ExpensesService {
 					currentDate,
 				);
 
-				// { "음식": 6600, "교통": 3300, ... }
-				todayCategoryRecommend[categoryName] = categoryProperAmount;
+				// [ { category: '음식', properAmount: 10000 }, { category: '카페', properAmount: 3000}, ... ]
+				todayCategoryProperAmounts.push({ category: categoryName, properAmount: categoryProperAmount });
 			});
 
 			return {
-				recommend_message: recommendMessage,
-				total_recommend: todayProperAmount,
-				category_recommend: todayCategoryRecommend,
+				recommendMessage,
+				todayProperAmount,
+				todayCategoryProperAmounts,
 			};
 		}
 
@@ -528,7 +528,6 @@ export class ExpensesService {
 		// 오늘 전체 지출 추천 계산
 		// 		월별 지출이 존재하는 경우: 월별 남은 금액 / 월에서 남은 일수
 		const remainingTotalAmount = monthlyBudget.totalAmount - monthlyExpense.totalAmount;
-		console.log(30 - day, remainingTotalAmount);
 		const { properAmount: todayProperAmount } = this.getProperAmountAndRisk(remainingTotalAmount, 0, day);
 
 		// 카테고리별 지출 금액 합계 계산
@@ -547,6 +546,7 @@ export class ExpensesService {
 		});
 
 		// 오늘 카테고리별 지출 추천 계산
+		const todayCategoryProperAmounts: CategoryProperAmount[] = [];
 		monthlyBudget.categoryBudgets.forEach((categoryBudget) => {
 			const categoryName = categoryBudget.category.name;
 
@@ -559,7 +559,7 @@ export class ExpensesService {
 			remainingCategoryAmount = remainingCategoryAmount > 0 ? remainingCategoryAmount : 0;
 			const { properAmount: categoryProperAmount } = this.getProperAmountAndRisk(remainingCategoryAmount, 0, day);
 
-			todayCategoryRecommend[categoryName] = categoryProperAmount;
+			todayCategoryProperAmounts.push({ category: categoryName, properAmount: categoryProperAmount });
 		});
 
 		// 추천 메세지 기준에 따라 추천 메세지 생성
@@ -571,9 +571,9 @@ export class ExpensesService {
 			properAmountUpToNow > monthlyExpense.totalAmount ? RecommendMessage.GOOD : RecommendMessage.BAD;
 
 		return {
-			recommend_message: recommendMessage,
-			total_recommend: todayProperAmount,
-			category_recommend: todayCategoryRecommend,
+			recommendMessage,
+			todayProperAmount,
+			todayCategoryProperAmounts,
 		};
 	}
 }
